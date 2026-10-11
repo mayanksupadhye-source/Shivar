@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en" id="html-root">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Shivar — Ecosystem Intelligence</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;600;700&family=Noto+Sans+Devanagari:wght@400;500;600;700&family=Noto+Sans+Gurmukhi:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<style>
+  *,*::before,*::after{margin:0;padding:0;box-sizing:border-box;}
+  :root{
+    --sky:#F0F9FF; --meadow:#F0FDF4; --field:#DCFCE7;
+    --leaf:#15803D; --leaf-deep:#14532D;
+    --blue:#2563EB; --blue-deep:#1E3A8A;
+    --gold:#FF9933; --gold-deep:#B45309;
+    --sand:#F8FAFC;
+    --text-main:#17352A; --text-muted:#526B61;
+    --line: rgba(20,83,45,0.16);
+    --card: rgba(255,255,255,0.88);
+    --accent: var(--leaf);
+    --accent-deep: var(--leaf-deep);
+    --danger:#B91C1C;
+  }
+  html{scroll-behavior:smooth;}
+  body{font-family:'DM Sans',sans-serif; background:linear-gradient(180deg,var(--meadow) 0%, var(--sky) 60%); color:var(--text-main); cursor:auto; padding-bottom:3rem;}
+  [lang="hi"], [lang="mr"] { font-family:'Noto Sans Devanagari','DM Sans',sans-serif; }
+  [lang="pa"] { font-family:'Noto Sans Gurmukhi','DM Sans',sans-serif; }
+  [lang="hi"] h1, [lang="mr"] h1 { font-family:'Noto Sans Devanagari',serif; }
+  [lang="pa"] h1 { font-family:'Noto Sans Gurmukhi',serif; }
+
+  nav{display:flex; align-items:center; justify-content:space-between; padding:1.5rem 4rem; flex-wrap:wrap; gap:1rem;}
+  .nav-logo{font-family:'Playfair Display',serif; font-size:1.4rem; font-weight:900; color:var(--leaf-deep); text-decoration:none;}
+  .nav-logo span{color:var(--blue-deep);}
+  .back-link{display:inline-flex; align-items:center; gap:.4rem; font-size:.88rem; font-weight:600; color:var(--text-muted); text-decoration:none;}
+  .back-link:hover{color:var(--accent-deep);}
+  .lang-grid{display:flex; gap:.4rem; flex-wrap:wrap;}
+  .lang-pill{font-size:.82rem; font-weight:500; padding:.4rem .9rem; border-radius:99px; border:1.3px solid var(--line); background:var(--card); color:var(--text-main); cursor:pointer; transition:.18s;}
+  .lang-pill:hover{border-color:var(--accent);}
+  .lang-pill.active{background:var(--accent); color:#fff; border-color:transparent;}
+
+  .api-badge{display:inline-flex; align-items:center; gap:.4rem; font-size:.72rem; font-weight:700; padding:.35rem .75rem; border-radius:99px; border:1.3px solid var(--line); background:var(--card); white-space:nowrap;}
+  .api-badge .dot{width:7px; height:7px; border-radius:50%; background:#94A3B8; flex-shrink:0;}
+  .api-badge.live .dot{background:#16A34A; box-shadow:0 0 0 3px rgba(22,163,74,.18);}
+  .api-badge.live{color:var(--leaf-deep); border-color:rgba(21,128,61,.35);}
+  .api-badge.offline .dot{background:#CA8A04;}
+  .api-badge.offline{color:#92400E; border-color:rgba(202,138,4,.35);}
+  .api-badge.checking .dot{background:#94A3B8; animation:pulseDot 1s ease-in-out infinite;}
+  @keyframes pulseDot{50%{opacity:.3;}}
+
+  .page-hero{max-width:820px; margin:2rem auto 2.2rem; padding:0 2rem; text-align:center;}
+  .eyebrow{display:inline-block; font-size:.76rem; letter-spacing:2px; text-transform:uppercase; color:var(--accent-deep); background:color-mix(in srgb, var(--accent) 12%, white); border:1px solid var(--line); padding:.4rem 1rem; border-radius:99px; margin-bottom:1.3rem; font-weight:600;}
+  h1{font-family:'Playfair Display',serif; font-weight:900; font-size:clamp(1.8rem,4.2vw,2.8rem); color:var(--accent-deep); line-height:1.15; margin-bottom:.9rem;}
+  .page-sub{color:var(--text-muted); font-size:1rem;}
+
+  /* ── farm profile switcher ── */
+  .profile-wrap{max-width:1080px; margin:0 auto 2.4rem; padding:0 2rem;}
+  .profile-label{font-size:.78rem; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:var(--text-muted); text-align:center; margin-bottom:.9rem;}
+  .profile-grid{display:flex; gap:.9rem; flex-wrap:wrap; justify-content:center;}
+  .profile-card{flex:1 1 220px; max-width:250px; text-align:left; background:var(--card); border:1.5px solid var(--line); border-radius:14px; padding:1rem 1.1rem; cursor:pointer; transition:.18s; }
+  .profile-card:hover{border-color:var(--accent); transform:translateY(-2px);}
+  .profile-card.active{border-color:var(--accent-deep); background:linear-gradient(135deg,color-mix(in srgb,var(--leaf) 10%,white),color-mix(in srgb,var(--blue) 8%,white)); box-shadow:0 10px 24px rgba(20,83,45,.14);}
+  .profile-card .pname{font-weight:700; font-size:.95rem; color:var(--text-main);}
+  .profile-card .ploc{font-size:.78rem; color:var(--text-muted); margin-top:.15rem;}
+  .profile-card .ptags{margin-top:.55rem; display:flex; gap:.35rem; flex-wrap:wrap;}
+  .profile-card .ptag{font-size:.68rem; font-weight:700; padding:.2rem .55rem; border-radius:6px; background:color-mix(in srgb,var(--leaf) 14%,white); color:var(--leaf-deep);}
+  .profile-card .ptag.blue{background:color-mix(in srgb,var(--blue) 12%,white); color:var(--blue-deep);}
+
+  /* ── summary banner ── */
+  .summary-banner{max-width:1080px; margin:0 auto 2.4rem; padding:0 2rem;}
+  .summary-inner{display:flex; gap:1.4rem; flex-wrap:wrap; align-items:stretch; background:linear-gradient(120deg,var(--leaf-deep),var(--blue-deep)); border-radius:20px; padding:1.6rem 1.9rem; color:#fff; box-shadow:0 18px 40px rgba(20,83,45,.22);}
+  .summary-stat{flex:1 1 150px;}
+  .summary-stat .num{font-family:'Playfair Display',serif; font-weight:900; font-size:1.9rem; line-height:1;}
+  .summary-stat .lbl{font-size:.76rem; opacity:.85; margin-top:.35rem; letter-spacing:.3px;}
+  .summary-note{flex:2 1 260px; font-size:.85rem; opacity:.92; align-self:center; line-height:1.5;}
+
+  /* ── section tabs ── */
+  .tabs{max-width:1080px; margin:0 auto 1.6rem; padding:0 2rem; display:flex; gap:.6rem; justify-content:center; flex-wrap:wrap;}
+  .tab-btn{font-family:'DM Sans',sans-serif; font-size:.88rem; font-weight:600; padding:.65rem 1.3rem; border-radius:10px; border:1.5px solid var(--line); background:var(--card); color:var(--text-muted); cursor:pointer; transition:.18s;}
+  .tab-btn:hover{border-color:var(--accent);}
+  .tab-btn.active{background:var(--accent-deep); color:#fff; border-color:transparent;}
+  .tab-panel{display:none;}
+  .tab-panel.active{display:block;}
+
+  .section-wrap{max-width:1080px; margin:0 auto; padding:0 2rem 1rem;}
+  .section-head{margin-bottom:1.3rem;}
+  .section-head h2{font-family:'Playfair Display',serif; font-size:1.35rem; color:var(--accent-deep); margin-bottom:.3rem;}
+  .section-head p{font-size:.88rem; color:var(--text-muted);}
+
+  /* ── scheme cards ── */
+  .scheme-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:1.1rem;}
+  .scheme-card{background:var(--card); border:1.5px solid var(--line); border-radius:16px; padding:1.4rem; display:flex; flex-direction:column; gap:.7rem; position:relative; transition:.2s;}
+  .scheme-card.matched{border-color:rgba(21,128,61,.35);}
+  .scheme-card.unmatched{opacity:.55;}
+  .scheme-top{display:flex; justify-content:space-between; align-items:flex-start; gap:.6rem;}
+  .scheme-level{font-size:.66rem; font-weight:800; letter-spacing:.6px; text-transform:uppercase; padding:.25rem .55rem; border-radius:6px; white-space:nowrap;}
+  .scheme-level.central{background:color-mix(in srgb,var(--blue) 14%,white); color:var(--blue-deep);}
+  .scheme-level.state{background:color-mix(in srgb,var(--gold) 20%,white); color:var(--gold-deep);}
+  .match-chip{font-size:.68rem; font-weight:800; padding:.25rem .6rem; border-radius:99px; display:inline-flex; align-items:center; gap:.3rem; white-space:nowrap;}
+  .match-chip.yes{background:color-mix(in srgb,var(--leaf) 16%,white); color:var(--leaf-deep);}
+  .match-chip.check{background:color-mix(in srgb,#F59E0B 18%,white); color:#92400E;}
+  .match-chip.no{background:#F1F5F9; color:#64748B;}
+  .scheme-name{font-family:'Playfair Display',serif; font-weight:700; font-size:1.05rem; color:var(--text-main); line-height:1.3;}
+  .scheme-name .native{display:block; font-size:.82rem; font-weight:500; color:var(--text-muted); font-family:'Noto Sans Devanagari','DM Sans',sans-serif; margin-top:.15rem;}
+  .scheme-benefit{font-size:.85rem; font-weight:600; color:var(--leaf-deep);}
+  .scheme-desc{font-size:.83rem; color:var(--text-muted); line-height:1.5;}
+  .reasons{list-style:none; display:flex; flex-direction:column; gap:.35rem; margin-top:.2rem;}
+  .reasons li{font-size:.78rem; color:var(--text-main); display:flex; gap:.4rem; line-height:1.4;}
+  .reasons li::before{content:'✓'; color:var(--leaf); font-weight:900; flex-shrink:0;}
+  .reasons li.warn::before{content:'!'; color:#B45309;}
+  .scheme-foot{margin-top:auto; padding-top:.5rem; display:flex; justify-content:space-between; align-items:center; gap:.6rem; border-top:1px dashed var(--line);}
+  .scheme-agency{font-size:.72rem; color:var(--text-muted);}
+  .scheme-link{font-size:.78rem; font-weight:700; color:var(--blue-deep); text-decoration:none; white-space:nowrap;}
+  .scheme-link:hover{text-decoration:underline;}
+
+  /* ── FPO cards ── */
+  .fpo-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:1.1rem;}
+  .fpo-card{background:var(--card); border:1.5px solid var(--line); border-radius:16px; padding:1.4rem; display:flex; flex-direction:column; gap:.6rem;}
+  .fpo-card.pending{border-style:dashed;}
+  .fpo-name{font-family:'Playfair Display',serif; font-weight:700; font-size:1.05rem; color:var(--text-main);}
+  .fpo-meta{font-size:.78rem; color:var(--text-muted);}
+  .fpo-desc{font-size:.83rem; color:var(--text-main); line-height:1.5;}
+  .fpo-tags{display:flex; gap:.35rem; flex-wrap:wrap;}
+  .fpo-tag{font-size:.68rem; font-weight:700; padding:.2rem .55rem; border-radius:6px; background:color-mix(in srgb,var(--leaf) 12%,white); color:var(--leaf-deep);}
+  .fpo-foot{margin-top:auto; padding-top:.5rem; border-top:1px dashed var(--line); display:flex; justify-content:space-between; align-items:center;}
+
+  /* ── support cards ── */
+  .support-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:1.2rem;}
+  .support-card{background:var(--card); border:1.5px solid var(--line); border-radius:16px; padding:1.5rem;}
+  .support-card h3{font-family:'Playfair Display',serif; font-size:1.1rem; color:var(--accent-deep); margin-bottom:.7rem;}
+  .support-item{margin-bottom:.9rem; padding-bottom:.9rem; border-bottom:1px dashed var(--line);}
+  .support-item:last-child{border-bottom:none; margin-bottom:0; padding-bottom:0;}
+  .support-item .siname{font-weight:700; font-size:.88rem; color:var(--text-main);}
+  .support-item .sidesc{font-size:.8rem; color:var(--text-muted); line-height:1.5; margin-top:.15rem;}
+  .support-item a{font-size:.76rem; font-weight:700; color:var(--blue-deep); text-decoration:none;}
+
+  .build-note{max-width:1080px; margin:2.5rem auto 1rem; padding:0 2rem;}
+  .build-note-inner{border-left:4px solid var(--accent); background:var(--card); border-radius:0 12px 12px 0; padding:1.3rem 1.6rem;}
+  .build-note-inner .label{font-size:.75rem; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:var(--accent-deep); margin-bottom:.4rem;}
+  .build-note-inner p{font-size:.85rem; color:var(--text-muted); line-height:1.6;}
+
+  @media (prefers-reduced-motion:reduce){*{transition-duration:.001ms !important;}}
+  a:focus-visible,button:focus-visible,.lang-pill:focus-visible{outline:2.5px solid var(--accent); outline-offset:2px;}
+  @media (max-width:640px){ nav{padding:1.2rem 1.4rem;} .page-hero,.profile-wrap,.summary-banner,.tabs,.section-wrap,.build-note{padding-left:1.2rem; padding-right:1.2rem;} }
+</style>
+</head>
+<body>
+
+<nav>
+  <a class="nav-logo" href="nexora-first-page.html">Shivar<span>.</span></a>
+  <a class="back-link" id="back-link" href="nexora-first-page.html">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M11 18l-6-6 6-6"/></svg>
+    <span data-i18n="navBack">Back to Home</span>
+  </a>
+  <div class="lang-grid" id="lang-grid">
+    <button class="lang-pill" data-lang="en">English</button>
+    <button class="lang-pill" data-lang="hi">हिंदी</button>
+    <button class="lang-pill" data-lang="mr">मराठी</button>
+    <button class="lang-pill" data-lang="pa">ਪੰਜਾਬੀ</button>
+  </div>
+  <span class="api-badge checking" id="api-badge"><span class="dot"></span><span id="api-badge-text">Checking API…</span></span>
+</nav>
+
+<section class="page-hero">
+  <span class="eyebrow" data-i18n="eyebrow">Ecosystem Intelligence</span>
+  <h1 data-i18n="title">Every scheme and network this farm qualifies for.</h1>
+  <p class="page-sub" data-i18n="subtitle">Government schemes, FPO membership, and support services — matched to this farm's profile, not searched one by one.</p>
+</section>
+
+<div class="profile-wrap">
+  <div class="profile-label" data-i18n="profileLabel">Sample farm profile — pick one to see live matching</div>
+  <div class="profile-grid" id="profile-grid"></div>
+</div>
+
+<div class="summary-banner">
+  <div class="summary-inner">
+    <div class="summary-stat"><div class="num" id="stat-matched">–</div><div class="lbl" data-i18n="statMatched">Schemes matched</div></div>
+    <div class="summary-stat"><div class="num" id="stat-cash">–</div><div class="lbl" data-i18n="statCash">Guaranteed annual DBT</div></div>
+    <div class="summary-stat"><div class="num" id="stat-fpo">–</div><div class="lbl" data-i18n="statFpo">FPOs in reach</div></div>
+    <div class="summary-note" id="summary-note" data-i18n="summaryNote">Selecting a farm profile re-runs the matching engine below against real, current scheme eligibility rules — nothing here is hand-picked per farmer.</div>
+  </div>
+</div>
+
+<div class="tabs">
+  <button class="tab-btn active" data-tab="schemes" data-i18n="tabSchemes">Govt. Schemes</button>
+  <button class="tab-btn" data-tab="fpo" data-i18n="tabFpo">FPO Network</button>
+  <button class="tab-btn" data-tab="support" data-i18n="tabSupport">Support Services</button>
+</div>
+
+<div class="section-wrap">
+  <div class="tab-panel active" id="panel-schemes">
+    <div class="section-head">
+      <h2 data-i18n="schemesHead">Schemes this farm qualifies for</h2>
+      <p data-i18n="schemesSub">Matched against crop, land size, farmer category, region and PMFBY notification status — updated the moment you switch profiles.</p>
+    </div>
+    <div class="scheme-grid" id="scheme-grid"></div>
+  </div>
+
+  <div class="tab-panel" id="panel-fpo">
+    <div class="section-head">
+      <h2 data-i18n="fpoHead">FPOs this farm can join</h2>
+      <p data-i18n="fpoSub">Farmer Producer Organisations active in this region, sourced from SFAC's registered-FPO directory.</p>
+    </div>
+    <div class="fpo-grid" id="fpo-grid"></div>
+  </div>
+
+  <div class="tab-panel" id="panel-support">
+    <div class="section-head">
+      <h2 data-i18n="supportHead">Support services for this farm's risk profile</h2>
+      <p data-i18n="supportSub">Insurance, credit, and advisory access points relevant to this crop and region.</p>
+    </div>
+    <div class="support-grid" id="support-grid"></div>
+  </div>
+</div>
+
+<div class="build-note">
+  <div class="build-note-inner">
+    <div class="label" data-i18n="buildLabel">Build Note</div>
+    <p data-i18n="buildText">Scheme rules, amounts, and eligibility bands above are encoded from official program guidelines (PM-KISAN, PMFBY, SFAC's 10,000-FPO scheme, MahaDBT, Namo Shetkari GR) as of August 2026 and evaluated live in your browser against each farm profile. FPO listings for Vidarbha and Konkan are marked "directory sync pending" rather than invented, since SFAC's public list does not yet surface a verified FPO for those two sample talukas. The four profiles above are illustrative sample farms from Shivar's location hierarchy, not live farmer accounts — connecting a real farmer's KYC would replace the profile switcher with their actual land record.</p>
+  </div>
+</div>
+
+<script>
+/* ============================= DATA ============================= */
+const PROFILES = [
+  { id:'nashik', name:'Ramesh Patil', region:'Western Maharashtra (Desh)', regionKey:'desh', district:'Nashik', taluka:'Niphad', crop:'Grapes', cropKey:'grapes', landAcres:2.5, category:'small', pmfbyType:'yield' },
+  { id:'yavatmal', name:'Sunita Rathod', region:'Vidarbha', regionKey:'vidarbha', district:'Yavatmal', taluka:'Pusad', crop:'Cotton', cropKey:'cotton', landAcres:4, category:'small', pmfbyType:'yield' },
+  { id:'osmanabad', name:'Baban Kale', region:'Marathwada', regionKey:'marathwada', district:'Dharashiv (Osmanabad)', taluka:'Tuljapur', crop:'Tur (Pigeon Pea)', cropKey:'tur', landAcres:1.5, category:'marginal', pmfbyType:'yield' },
+  { id:'ratnagiri', name:'Meena Sawant', region:'Konkan', regionKey:'konkan', district:'Ratnagiri', taluka:'Devgad', crop:'Alphonso Mango', cropKey:'mango', landAcres:1, category:'marginal', pmfbyType:'weather' }
+];
+
+function hectares(p){ return +(p.landAcres/2.471).toFixed(2); }
+
+const SCHEMES = [
+  { id:'pmkisan', level:'central', name:'PM-KISAN Samman Nidhi', native:'प्रधानमंत्री किसान सम्मान निधी', agency:'Dept. of Agriculture & Farmers Welfare, GoI', link:'https://pmkisan.gov.in', cash:6000,
+    benefit:'₹6,000/year in 3 instalments (DBT)',
+    desc:'Direct income support to landholding farmer families; no minimum land-size cap since April 2019.',
+    test:(p)=>({match:true, reasons:['Cultivable land recorded under this farm\u2019s name, no income-tax filings on record.']}) },
+  { id:'namoshetkari', level:'state', name:'Namo Shetkari Maha Sanman Nidhi', native:'नमो शेतकरी महासन्मान निधी योजना', agency:'Govt. of Maharashtra', link:'https://mahadbtmahait.gov.in', cash:6000,
+    benefit:'₹6,000/year top-up on PM-KISAN (₹12,000/year combined)',
+    desc:'Maharashtra\u2019s own top-up scheme, GR Kisani-2023/CR-42/11A — mirrors PM-KISAN eligibility exactly.',
+    test:(p)=>({match:true, reasons:['Automatically follows this farm\u2019s PM-KISAN eligibility.']}) },
+  { id:'pmfby', level:'central', name:'Pradhan Mantri Fasal Bima Yojana', native:'प्रधानमंत्री फसल बीमा योजना', agency:'Ministry of Agriculture, GoI', link:'https://pmfby.gov.in',
+    benefit:'Yield-shortfall cover; farmer pays 1.5–5% of premium, rest subsidised',
+    desc:'Covers a notified crop grown in a notified village during a notified season.',
+    test:(p)=> p.pmfbyType==='yield'
+      ? {match:true, reasons:[`${p.crop} is a PMFBY-notified crop in ${p.taluka} taluka, ${p.district} for the current season.`]}
+      : {match:false, reasons:[]} },
+  { id:'rwbcis', level:'central', name:'Restructured Weather Based Crop Insurance', native:'हवामान आधारित पीक विमा योजना', agency:'Ministry of Agriculture, GoI', link:'https://pmfby.gov.in',
+    benefit:'Payout triggered by rainfall/temperature deviation, not measured yield loss',
+    desc:'Used in place of PMFBY for horticulture crops like Konkan mango where yield-cutting experiments aren\u2019t practical.',
+    test:(p)=> p.pmfbyType==='weather'
+      ? {match:true, reasons:[`${p.crop} in ${p.district} is covered under RWBCIS rather than standard PMFBY.`]}
+      : {match:false, reasons:[]} },
+  { id:'maha1rupee', level:'state', name:'Maharashtra \u20b91 Crop Insurance Scheme', native:'सर्वसमावेशक पीक विमा योजना (१ रुपयात)', agency:'Govt. of Maharashtra', link:'https://krishi.maharashtra.gov.in',
+    benefit:'State pays the farmer\u2019s entire PMFBY premium share — farmer contributes ₹1',
+    desc:'Applies on top of PMFBY/RWBCIS for any Maharashtra farmer enrolling for the notified crop.',
+    test:(p)=> (p.pmfbyType==='yield'||p.pmfbyType==='weather')
+      ? {match:true, reasons:['State absorbs your premium share once you enrol under PMFBY/RWBCIS for this crop.']}
+      : {match:false, reasons:[]} },
+  { id:'kcc', level:'central', name:'Kisan Credit Card', native:'किसान क्रेडिट कार्ड', agency:'NABARD / scheduled banks', link:'https://www.jansamarth.in',
+    benefit:'Crop-loan limit at 4% effective interest (with prompt-repayment subvention), up to ₹3 lakh',
+    desc:'Short-term credit for inputs, plus term-loan component for allied activities.',
+    test:(p)=>({match:true, reasons:['Any recorded operational landholding qualifies for a KCC credit limit.']}) },
+  { id:'shc', level:'central', name:'Soil Health Card Scheme', native:'मृदा आरोग्य पत्रिका योजना', agency:'Dept. of Agriculture, GoI', link:'https://soilhealth.dac.gov.in',
+    benefit:'Free soil test every 2 years with fertiliser-dosage recommendations',
+    desc:'Open to any cultivable landholding, no size floor.',
+    test:(p)=>({match:true, reasons:['No minimum landholding — this farm qualifies regardless of size.']}) },
+  { id:'enam', level:'central', name:'e-NAM', native:'राष्ट्रीय कृषी बाजार', agency:'SFAC, Ministry of Agriculture', link:'https://enam.gov.in',
+    benefit:'Online price discovery and inter-mandi trading for produce',
+    desc:'Removes single-mandi dependence for selling the harvest.',
+    test:(p)=>({match:true, reasons:[`${p.crop} is traded on e-NAM through the nearest integrated APMC mandi.`]}) },
+  { id:'kusum', level:'central', name:'PM-KUSUM', native:'पीएम कुसुम योजना', agency:'Ministry of New & Renewable Energy', link:'https://pmkusum.mnre.gov.in',
+    benefit:'Up to 60% subsidy on a solar irrigation pump, 30% as bank loan',
+    desc:'Cuts diesel/grid dependence for micro-irrigation.',
+    test:(p)=>({match:true, reasons:['Landholding size supports a standalone solar pump under Component-B.']}) },
+  { id:'microirrigation', level:'state', name:'Micro-Irrigation Subsidy (Drip/Sprinkler)', native:'सूक्ष्म सिंचन अनुदान योजना', agency:'Govt. of Maharashtra / MahaDBT', link:'https://mahadbtmahait.gov.in',
+    benefit:null,
+    desc:'80% subsidy for marginal farmers (<1 ha), 70% for small (1–2 ha); +10% top-up in Marathwada & Vidarbha.',
+    test:(p)=>{
+      const base = p.category==='marginal' ? 80 : 70;
+      const topup = (p.regionKey==='marathwada'||p.regionKey==='vidarbha') ? 10 : 0;
+      const total = base+topup;
+      const reasons = [`${p.category==='marginal'?'Marginal':'Small'} farmer band → ${base}% base subsidy on drip/sprinkler equipment.`];
+      if(topup) reasons.push(`+${topup}% drought-prone top-up for ${p.region}.`);
+      return {match:true, reasons, computedBenefit:`Up to ${total}% subsidy on drip/sprinkler equipment for ${p.crop}`};
+    } },
+  { id:'yantrikikaran', level:'state', name:'Krishi Yantrikikaran Yojana', native:'कृषी यांत्रिकीकरण योजना', agency:'Govt. of Maharashtra / MahaDBT', link:'https://mahadbtmahait.gov.in',
+    benefit:'Subsidy up to 80% on farm machinery for priority categories',
+    desc:'Priority to SC/ST, women, and small/marginal farmers; general category gets a lower slab.',
+    test:(p)=> (p.category==='marginal'||p.category==='small')
+      ? {match:true, reasons:[`${p.category==='marginal'?'Marginal':'Small'}-farmer category places this farm in the priority subsidy slab.`]}
+      : {match:false, reasons:[]} },
+  { id:'pahsky', level:'state', name:'Punyashlok Ahilyadevi Holkar Shetkari Karjmukti Yojana', native:'पुण्यश्लोक अहिल्यादेवी होळकर शेतकरी कर्जमुक्ती योजना', agency:'Govt. of Maharashtra', link:'https://krishi.maharashtra.gov.in',
+    benefit:'Waiver of eligible outstanding crop-loan dues',
+    desc:'Coverage depends on whether this farm carries a qualifying pending crop-loan balance — can\u2019t be confirmed without bank records.',
+    test:(p)=>({match:'check', reasons:['Eligibility depends on an existing crop-loan balance at a bank/PACS/DCCB — verify against this farm\u2019s loan account.']}) },
+  { id:'pmkmy', level:'central', name:'PM Kisan Maan-Dhan Yojana', native:'पीएम किसान मानधन योजना', agency:'LIC / Ministry of Agriculture', link:'https://maandhan.in',
+    benefit:'₹3,000/month pension after age 60, contribution ₹55–200/month',
+    desc:'Voluntary pension scheme for small and marginal landholders aged 18–40 at entry.',
+    test:(p)=> (p.category==='small'||p.category==='marginal')
+      ? {match:true, reasons:[`${p.category==='marginal'?'Marginal':'Small'}-farmer landholding meets the entry criterion (age 18\u201340 at enrolment needed too).`]}
+      : {match:false, reasons:[]} }
+];
+
+const FPOS = {
+  desh: [
+    { name:'Sahyadri Farmers Producer Company Ltd.', loc:'Mohadi, Nashik — ~18 km from Niphad', crop:'Grapes, horticulture export', members:'12,000+ farmer-members', desc:'India\u2019s largest fruit & vegetable FPO — owns pack-houses, cold chain and its own export brand for table grapes.', link:'https://sahyadrifarms.com', tags:['Export linkage','Cold storage'] },
+    { name:'Mahagrapes (Maharashtra State Grape Growers Marketing Coop. Federation)', loc:'Pune — apex federation, Nashik cluster affiliated', crop:'Grapes', members:'Federation of grower cooperatives', desc:'Apex marketing body coordinating grape exports to the EU on behalf of member cooperatives.', link:'https://mahagrapes.com', tags:['Apex federation','Price negotiation'] }
+  ],
+  marathwada: [
+    { name:'Jaylaxmi Farmers Producer Company Ltd.', loc:'Osmanabad (Dharashiv) — SFAC-registered', crop:'Tur & other pulses', members:'SFAC-promoted FPO under the Osmanabad Pulses Programme', desc:'Formed with support from AFARM (Action for Agricultural Renewal in Maharashtra) for collective pulses procurement and input aggregation.', link:'https://sfacindia.com/FPOS.aspx', tags:['Pulses aggregation','Bulk input buying'] }
+  ],
+  vidarbha: [],
+  konkan: []
+};
+
+const SUPPORT = {
+  insurance: [
+    { name:'Empanelled PMFBY/RWBCIS insurer for your district', desc:'Rotates by season and district tender — currently drawn from Agriculture Insurance Company of India, Bajaj Allianz, ICICI Lombard, HDFC ERGO and other empanelled insurers. Confirm this season\u2019s assigned insurer on the portal.', link:'https://pmfby.gov.in' },
+    { name:'Toll-free claim intimation', desc:'Report crop loss within 72 hours of the event to the insurer, bank, or local agriculture office — the single most missed step in claims.', link:null }
+  ],
+  credit: [
+    { name:'Kisan Credit Card (via nationalised bank / PACS / DCCB)', desc:'Short-term crop loan plus a term-loan component for allied activities, at a subsidised effective rate for prompt repayers.', link:'https://www.jansamarth.in' },
+    { name:'District Central Cooperative Bank (DCCB)', desc:'Primary cooperative credit channel for most Maharashtra farmers, often the fastest route to a KCC sanction at the taluka level.', link:null }
+  ],
+  advisory: [
+    { name:'Krishi Vigyan Kendra (KVK), district-level', desc:'ICAR\u2019s district-level front-line extension centre — free soil, pest and crop-package advisory, demonstration plots.', link:'https://kvk.icar.gov.in' },
+    { name:'MahaDBT Farmer Portal', desc:'Single application window for most Maharashtra state schemes referenced above.', link:'https://mahadbtmahait.gov.in' }
+  ]
+};
+
+/* ============================= I18N (chrome only) ============================= */
+const I18N = {
+  en:{ navBack:"Back to Home", eyebrow:"Ecosystem Intelligence", title:"Every scheme and network this farm qualifies for.",
+    subtitle:"Government schemes, FPO membership, and support services — matched to this farm's profile, not searched one by one.",
+    profileLabel:"Sample farm profile — pick one to see live matching",
+    statMatched:"Schemes matched", statCash:"Guaranteed annual DBT", statFpo:"FPOs in reach",
+    summaryNote:"Selecting a farm profile re-runs the matching engine below against real, current scheme eligibility rules — nothing here is hand-picked per farmer.",
+    tabSchemes:"Govt. Schemes", tabFpo:"FPO Network", tabSupport:"Support Services",
+    schemesHead:"Schemes this farm qualifies for", schemesSub:"Matched against crop, land size, farmer category, region and PMFBY notification status — updated the moment you switch profiles.",
+    fpoHead:"FPOs this farm can join", fpoSub:"Farmer Producer Organisations active in this region, sourced from SFAC's registered-FPO directory.",
+    supportHead:"Support services for this farm's risk profile", supportSub:"Insurance, credit, and advisory access points relevant to this crop and region.",
+    buildLabel:"Build Note", buildText:"Scheme rules, amounts, and eligibility bands above are encoded from official program guidelines (PM-KISAN, PMFBY, SFAC's 10,000-FPO scheme, MahaDBT, Namo Shetkari GR) as of August 2026 and evaluated live in your browser against each farm profile. FPO listings for Vidarbha and Konkan are marked \"directory sync pending\" rather than invented, since SFAC's public list does not yet surface a verified FPO for those two sample talukas. The four profiles above are illustrative sample farms from Shivar's location hierarchy, not live farmer accounts — connecting a real farmer's KYC would replace the profile switcher with their actual land record.",
+    apply:"Apply / Learn more", checkTag:"Verify eligibility", noTag:"Not applicable here", yesTag:"Matched", pending:"Directory sync pending", pendingDesc:"SFAC's public FPO list does not yet surface a verified, named FPO for this taluka. Rather than invent one, this farm sees a direct path to SFAC's 10,000-FPO formation scheme instead.", formFpo:"Start or join one via SFAC's scheme",
+    apiLive:"Live API — server-matched", apiOffline:"Offline demo mode — bundled data" },
+  hi:{ navBack:"होम पर वापस जाएं", eyebrow:"पारिस्थितिकी तंत्र इंटेलिजेंस", title:"इस खेत के लिए योग्य हर योजना और नेटवर्क।",
+    subtitle:"सरकारी योजनाएं, एफपीओ सदस्यता, और सहायता सेवाएं — इस खेत की प्रोफ़ाइल के अनुसार, एक-एक करके खोजे बिना।",
+    profileLabel:"नमूना खेत प्रोफ़ाइल — लाइव मिलान देखने के लिए एक चुनें",
+    statMatched:"मिलान की गई योजनाएं", statCash:"गारंटीकृत वार्षिक डीबीटी", statFpo:"पहुंच में एफपीओ",
+    summaryNote:"खेत प्रोफ़ाइल चुनने पर नीचे का मिलान इंजन वास्तविक, वर्तमान योजना पात्रता नियमों के अनुसार फिर से चलता है — यहां कुछ भी किसान के अनुसार हाथ से नहीं चुना गया है।",
+    tabSchemes:"सरकारी योजनाएं", tabFpo:"एफपीओ नेटवर्क", tabSupport:"सहायता सेवाएं",
+    schemesHead:"इस खेत के लिए पात्र योजनाएं", schemesSub:"फसल, भूमि आकार, किसान श्रेणी, क्षेत्र और पीएमएफबीवाई अधिसूचना स्थिति से मिलान — प्रोफ़ाइल बदलते ही अपडेट होता है।",
+    fpoHead:"एफपीओ जिनसे यह खेत जुड़ सकता है", fpoSub:"इस क्षेत्र में सक्रिय किसान उत्पादक संगठन, एसएफएसी की पंजीकृत-एफपीओ डायरेक्टरी से।",
+    supportHead:"इस खेत की जोखिम प्रोफ़ाइल के लिए सहायता सेवाएं", supportSub:"इस फसल और क्षेत्र के लिए प्रासंगिक बीमा, ऋण और सलाहकार पहुंच बिंदु।",
+    buildLabel:"बिल्ड नोट", buildText:"ऊपर दिए गए योजना नियम, राशि और पात्रता सीमाएं आधिकारिक कार्यक्रम दिशानिर्देशों (पीएम-किसान, पीएमएफबीवाई, एसएफएसी की 10,000-एफपीओ योजना, महाडीबीटी, नमो शेतकरी जीआर) से अगस्त 2026 तक एन्कोड की गई हैं और हर खेत प्रोफ़ाइल के विरुद्ध आपके ब्राउज़र में लाइव मूल्यांकित होती हैं। विदर्भ और कोंकण के लिए एफपीओ सूचियों को गढ़ने के बजाय \"डायरेक्टरी सिंक लंबित\" चिह्नित किया गया है, क्योंकि एसएफएसी की सार्वजनिक सूची इन दो नमूना तालुकाओं के लिए अभी कोई सत्यापित एफपीओ नहीं दिखाती। ऊपर के चार प्रोफ़ाइल शिवार के लोकेशन पदानुक्रम के उदाहरण नमूना खेत हैं, लाइव किसान खाते नहीं — किसी असली किसान का केवाईसी जोड़ने पर यह प्रोफ़ाइल स्विचर उनके वास्तविक भूमि रिकॉर्ड से बदल जाएगा।",
+    apply:"आवेदन करें / और जानें", checkTag:"पात्रता जांचें", noTag:"यहां लागू नहीं", yesTag:"मिलान हुआ", pending:"डायरेक्टरी सिंक लंबित", pendingDesc:"एसएफएसी की सार्वजनिक एफपीओ सूची में इस तालुका के लिए अभी कोई सत्यापित, नामित एफपीओ नहीं है। एक गढ़ने के बजाय, इस खेत को सीधे एसएफएसी की 10,000-एफपीओ गठन योजना का रास्ता दिखाया गया है।", formFpo:"एसएफएसी की योजना के जरिए एक शुरू करें या जुड़ें",
+    apiLive:"लाइव एपीआई — सर्वर से मिलान", apiOffline:"ऑफ़लाइन डेमो मोड — बंडल डेटा" },
+  mr:{ navBack:"मुख्यपृष्ठावर परत जा", eyebrow:"परिसंस्था इंटेलिजन्स", title:"या शेतासाठी पात्र प्रत्येक योजना आणि नेटवर्क.",
+    subtitle:"सरकारी योजना, एफपीओ सदस्यत्व आणि सहाय्य सेवा — या शेताच्या प्रोफाइलनुसार, एक-एक शोधण्याऐवजी.",
+    profileLabel:"नमुना शेत प्रोफाइल — लाइव्ह जुळणी पाहण्यासाठी एक निवडा",
+    statMatched:"जुळलेल्या योजना", statCash:"हमी वार्षिक डीबीटी", statFpo:"पोहोचण्याच्या टप्प्यातील एफपीओ",
+    summaryNote:"शेत प्रोफाइल निवडल्यावर खालील जुळणी इंजिन प्रत्यक्ष, सध्याच्या योजना पात्रता नियमांनुसार पुन्हा चालते — इथे कोणतीही गोष्ट शेतकऱ्यानुसार हाताने निवडलेली नाही.",
+    tabSchemes:"सरकारी योजना", tabFpo:"एफपीओ नेटवर्क", tabSupport:"सहाय्य सेवा",
+    schemesHead:"या शेतासाठी पात्र योजना", schemesSub:"पीक, जमिनीचा आकार, शेतकरी वर्ग, प्रदेश आणि पीएमएफबीवाय अधिसूचना स्थितीनुसार जुळणी — प्रोफाइल बदलताच अद्ययावत होते.",
+    fpoHead:"या शेताला सामील होता येईल असे एफपीओ", fpoSub:"या प्रदेशात सक्रिय शेतकरी उत्पादक संस्था, एसएफएसीच्या नोंदणीकृत-एफपीओ यादीतून.",
+    supportHead:"या शेताच्या जोखीम प्रोफाइलसाठी सहाय्य सेवा", supportSub:"या पीक आणि प्रदेशासाठी संबंधित विमा, कर्ज आणि सल्ला सेवा प्रवेश बिंदू.",
+    buildLabel:"बिल्ड नोंद", buildText:"वरील योजना नियम, रक्कम आणि पात्रता मर्यादा अधिकृत कार्यक्रम मार्गदर्शक तत्त्वांवरून (पीएम-किसान, पीएमएफबीवाय, एसएफएसीची 10,000-एफपीओ योजना, महाडीबीटी, नमो शेतकरी जीआर) ऑगस्ट 2026 पर्यंत एन्कोड केल्या आहेत आणि प्रत्येक शेत प्रोफाइलविरुद्ध तुमच्या ब्राउझरमध्ये लाइव्ह मूल्यांकित होतात. विदर्भ आणि कोकणासाठी एफपीओ यादी बनवण्याऐवजी \"डायरेक्टरी सिंक प्रलंबित\" असे चिन्हांकित केले आहे, कारण एसएफएसीची सार्वजनिक यादी या दोन नमुना तालुक्यांसाठी अद्याप कोणताही सत्यापित एफपीओ दाखवत नाही. वरील चार प्रोफाइल शिवारच्या स्थान पदानुक्रमातील उदाहरणादाखल नमुना शेते आहेत, प्रत्यक्ष शेतकरी खाती नाहीत — खऱ्या शेतकऱ्याचे केवायसी जोडल्यास हा प्रोफाइल स्विचर त्यांच्या प्रत्यक्ष जमीन नोंदीने बदलेल.",
+    apply:"अर्ज करा / अधिक जाणून घ्या", checkTag:"पात्रता तपासा", noTag:"इथे लागू नाही", yesTag:"जुळले", pending:"डायरेक्टरी सिंक प्रलंबित", pendingDesc:"एसएफएसीच्या सार्वजनिक एफपीओ यादीत या तालुक्यासाठी अद्याप कोणताही सत्यापित, नामांकित एफपीओ नाही. एक बनवण्याऐवजी, या शेताला थेट एसएफएसीच्या 10,000-एफपीओ स्थापना योजनेचा मार्ग दाखवला आहे.", formFpo:"एसएफएसीच्या योजनेद्वारे एक सुरू करा किंवा सामील व्हा",
+    apiLive:"लाइव्ह एपीआय — सर्व्हरने जुळवले", apiOffline:"ऑफलाइन डेमो मोड — बंडल डेटा" },
+  pa:{ navBack:"ਹੋਮ 'ਤੇ ਵਾਪਸ ਜਾਓ", eyebrow:"ਈਕੋਸਿਸਟਮ ਇੰਟੈਲੀਜੈਂਸ", title:"ਇਸ ਖੇਤ ਲਈ ਯੋਗ ਹਰ ਸਕੀਮ ਅਤੇ ਨੈੱਟਵਰਕ।",
+    subtitle:"ਸਰਕਾਰੀ ਸਕੀਮਾਂ, FPO ਮੈਂਬਰਸ਼ਿਪ ਅਤੇ ਸਹਾਇਤਾ ਸੇਵਾਵਾਂ — ਇਸ ਖੇਤ ਦੀ ਪ੍ਰੋਫਾਈਲ ਅਨੁਸਾਰ, ਇੱਕ-ਇੱਕ ਕਰਕੇ ਲੱਭਣ ਦੀ ਬਜਾਏ।",
+    profileLabel:"ਨਮੂਨਾ ਖੇਤ ਪ੍ਰੋਫਾਈਲ — ਲਾਈਵ ਮਿਲਾਨ ਵੇਖਣ ਲਈ ਇੱਕ ਚੁਣੋ",
+    statMatched:"ਮਿਲਾਨ ਹੋਈਆਂ ਸਕੀਮਾਂ", statCash:"ਗਾਰੰਟੀਸ਼ੁਦਾ ਸਾਲਾਨਾ DBT", statFpo:"ਪਹੁੰਚ ਵਿੱਚ FPO",
+    summaryNote:"ਖੇਤ ਪ੍ਰੋਫਾਈਲ ਚੁਣਨ ਨਾਲ ਹੇਠਾਂ ਦਾ ਮਿਲਾਨ ਇੰਜਣ ਅਸਲ, ਮੌਜੂਦਾ ਸਕੀਮ ਯੋਗਤਾ ਨਿਯਮਾਂ ਅਨੁਸਾਰ ਦੁਬਾਰਾ ਚਲਦਾ ਹੈ — ਇੱਥੇ ਕੁਝ ਵੀ ਕਿਸਾਨ ਅਨੁਸਾਰ ਹੱਥੀਂ ਨਹੀਂ ਚੁਣਿਆ ਗਿਆ।",
+    tabSchemes:"ਸਰਕਾਰੀ ਸਕੀਮਾਂ", tabFpo:"FPO ਨੈੱਟਵਰਕ", tabSupport:"ਸਹਾਇਤਾ ਸੇਵਾਵਾਂ",
+    schemesHead:"ਇਸ ਖੇਤ ਲਈ ਯੋਗ ਸਕੀਮਾਂ", schemesSub:"ਫ਼ਸਲ, ਜ਼ਮੀਨ ਦਾ ਆਕਾਰ, ਕਿਸਾਨ ਸ਼੍ਰੇਣੀ, ਖੇਤਰ ਅਤੇ PMFBY ਨੋਟੀਫਿਕੇਸ਼ਨ ਸਥਿਤੀ ਨਾਲ ਮਿਲਾਨ — ਪ੍ਰੋਫਾਈਲ ਬਦਲਦੇ ਹੀ ਅੱਪਡੇਟ ਹੁੰਦਾ ਹੈ।",
+    fpoHead:"FPO ਜਿਨ੍ਹਾਂ ਵਿੱਚ ਇਹ ਖੇਤ ਸ਼ਾਮਲ ਹੋ ਸਕਦਾ ਹੈ", fpoSub:"ਇਸ ਖੇਤਰ ਵਿੱਚ ਸਰਗਰਮ ਕਿਸਾਨ ਉਤਪਾਦਕ ਸੰਗਠਨ, SFAC ਦੀ ਰਜਿਸਟਰਡ-FPO ਡਾਇਰੈਕਟਰੀ ਤੋਂ।",
+    supportHead:"ਇਸ ਖੇਤ ਦੀ ਜੋਖਮ ਪ੍ਰੋਫਾਈਲ ਲਈ ਸਹਾਇਤਾ ਸੇਵਾਵਾਂ", supportSub:"ਇਸ ਫ਼ਸਲ ਅਤੇ ਖੇਤਰ ਲਈ ਢੁਕਵੇਂ ਬੀਮਾ, ਕਰਜ਼ਾ ਅਤੇ ਸਲਾਹਕਾਰ ਪਹੁੰਚ ਬਿੰਦੂ।",
+    buildLabel:"ਬਿਲਡ ਨੋਟ", buildText:"ਉੱਪਰ ਦਿੱਤੇ ਸਕੀਮ ਨਿਯਮ, ਰਕਮਾਂ ਅਤੇ ਯੋਗਤਾ ਸੀਮਾਵਾਂ ਸਰਕਾਰੀ ਪ੍ਰੋਗਰਾਮ ਦਿਸ਼ਾ-ਨਿਰਦੇਸ਼ਾਂ (PM-KISAN, PMFBY, SFAC ਦੀ 10,000-FPO ਸਕੀਮ, MahaDBT, ਨਮੋ ਸ਼ੇਤਕਰੀ GR) ਤੋਂ ਅਗਸਤ 2026 ਤੱਕ ਏਨਕੋਡ ਕੀਤੀਆਂ ਗਈਆਂ ਹਨ ਅਤੇ ਹਰ ਖੇਤ ਪ੍ਰੋਫਾਈਲ ਵਿਰੁੱਧ ਤੁਹਾਡੇ ਬ੍ਰਾਊਜ਼ਰ ਵਿੱਚ ਲਾਈਵ ਮੁਲਾਂਕਣ ਹੁੰਦੀਆਂ ਹਨ। ਵਿਦਰਭ ਅਤੇ ਕੋਂਕਣ ਲਈ FPO ਸੂਚੀਆਂ ਨੂੰ ਘੜਨ ਦੀ ਬਜਾਏ \"ਡਾਇਰੈਕਟਰੀ ਸਿੰਕ ਬਾਕੀ\" ਵਜੋਂ ਚਿੰਨ੍ਹਿਤ ਕੀਤਾ ਗਿਆ ਹੈ। ਉੱਪਰਲੇ ਚਾਰ ਪ੍ਰੋਫਾਈਲ ਸ਼ਿਵਾਰ ਦੇ ਸਥਾਨ ਦਰਜਾਬੰਦੀ ਦੇ ਉਦਾਹਰਨੀ ਨਮੂਨਾ ਖੇਤ ਹਨ, ਲਾਈਵ ਕਿਸਾਨ ਖਾਤੇ ਨਹੀਂ।",
+    apply:"ਅਪਲਾਈ ਕਰੋ / ਹੋਰ ਜਾਣੋ", checkTag:"ਯੋਗਤਾ ਤਸਦੀਕ ਕਰੋ", noTag:"ਇੱਥੇ ਲਾਗੂ ਨਹੀਂ", yesTag:"ਮਿਲਾਨ ਹੋਇਆ", pending:"ਡਾਇਰੈਕਟਰੀ ਸਿੰਕ ਬਾਕੀ", pendingDesc:"SFAC ਦੀ ਜਨਤਕ FPO ਸੂਚੀ ਵਿੱਚ ਇਸ ਤਾਲੁਕਾ ਲਈ ਅਜੇ ਕੋਈ ਤਸਦੀਕਸ਼ੁਦਾ FPO ਨਹੀਂ ਹੈ। ਇਸ ਖੇਤ ਨੂੰ ਸਿੱਧਾ SFAC ਦੀ 10,000-FPO ਸਕੀਮ ਦਾ ਰਾਹ ਦਿਖਾਇਆ ਗਿਆ ਹੈ।", formFpo:"SFAC ਦੀ ਸਕੀਮ ਰਾਹੀਂ ਇੱਕ ਸ਼ੁਰੂ ਕਰੋ ਜਾਂ ਸ਼ਾਮਲ ਹੋਵੋ",
+    apiLive:"ਲਾਈਵ API — ਸਰਵਰ ਤੋਂ ਮਿਲਾਨ", apiOffline:"ਆਫਲਾਈਨ ਡੈਮੋ ਮੋਡ — ਬੰਡਲਡ ਡਾਟਾ" }
+};
+
+let currentLang = 'en';
+let currentProfileId = 'nashik';
+
+/* ============================= LIVE API LAYER ============================= */
+/* Points at the Flask backend in /backend/app.py. Change this if you deploy
+   the API elsewhere (ngrok URL, Render, a college server, etc.) — everything
+   else in this file adapts automatically via apiUp/matchCache. */
+const API_BASE = 'http://localhost:5000';
+let apiUp = false;
+let matchCache = {}; // profile_id -> server response, refreshed on demand
+
+async function checkApi(){
+  const badge = document.getElementById('api-badge');
+  const badgeText = document.getElementById('api-badge-text');
+  try{
+    const res = await fetch(API_BASE + '/api/health', { signal: AbortSignal.timeout(1500) });
+    if(!res.ok) throw new Error('bad status');
+    apiUp = true;
+    badge.className = 'api-badge live';
+    badgeText.textContent = t('apiLive');
+  }catch(err){
+    apiUp = false;
+    badge.className = 'api-badge offline';
+    badgeText.textContent = t('apiOffline');
+  }
+}
+
+async function fetchMatch(profileId){
+  if(!apiUp) return null;
+  if(matchCache[profileId]) return matchCache[profileId];
+  try{
+    const res = await fetch(API_BASE + '/api/match/' + profileId, { signal: AbortSignal.timeout(2000) });
+    if(!res.ok) throw new Error('bad status');
+    const data = await res.json();
+    matchCache[profileId] = data;
+    return data;
+  }catch(err){
+    // API answered checkApi() but this call failed — fall back silently for this render
+    return null;
+  }
+}
+
+/* ============================= RENDER ============================= */
+function t(key){ return (I18N[currentLang] && I18N[currentLang][key]) || I18N.en[key] || key; }
+
+function renderProfiles(){
+  const grid = document.getElementById('profile-grid');
+  grid.innerHTML = PROFILES.map(p => `
+    <div class="profile-card ${p.id===currentProfileId?'active':''}" data-id="${p.id}">
+      <div class="pname">${p.name}</div>
+      <div class="ploc">${p.taluka}, ${p.district} · ${p.region}</div>
+      <div class="ptags">
+        <span class="ptag">${p.crop}</span>
+        <span class="ptag blue">${p.landAcres} ac · ${hectares(p)} ha</span>
+        <span class="ptag">${p.category==='marginal'?'Marginal':'Small'} farmer</span>
+      </div>
+    </div>`).join('');
+  grid.querySelectorAll('.profile-card').forEach(el => el.addEventListener('click', () => {
+    currentProfileId = el.dataset.id;
+    renderAll();
+  }));
+}
+
+/* Renders from a unified shape: array of {level,name,native,agency,link,benefit,desc,match,reasons,cash?}
+   Produced either by the live API (already in this shape) or computed locally from SCHEMES as a fallback. */
+function schemesFromLocal(profile){
+  return SCHEMES.map(s => {
+    const r = s.test(profile);
+    return { id:s.id, level:s.level, name:s.name, native:s.native, agency:s.agency, link:s.link,
+      benefit: r.computedBenefit || s.benefit, desc:s.desc, match:r.match, reasons:r.reasons, cash:s.cash };
+  });
+}
+
+function renderSchemesFrom(schemeList){
+  const grid = document.getElementById('scheme-grid');
+  let matchedCount = 0, cashTotal = 0;
+  grid.innerHTML = schemeList.map(s => {
+    const isYes = s.match === true;
+    const isCheck = s.match === 'check';
+    if(isYes){ matchedCount++; if(s.cash) cashTotal += s.cash; }
+    const stateClass = isYes ? 'matched' : (isCheck ? 'matched' : 'unmatched');
+    const chip = isYes ? `<span class="match-chip yes">✓ ${t('yesTag')}</span>` : isCheck ? `<span class="match-chip check">? ${t('checkTag')}</span>` : `<span class="match-chip no">${t('noTag')}</span>`;
+    const reasonsHtml = (s.reasons||[]).map(x => `<li class="${isCheck?'warn':''}">${x}</li>`).join('');
+    return `
+    <div class="scheme-card ${stateClass}">
+      <div class="scheme-top">
+        <span class="scheme-level ${s.level}">${s.level==='central'?'Central':'Maharashtra'}</span>
+        ${chip}
+      </div>
+      <div class="scheme-name">${s.name}<span class="native">${s.native||''}</span></div>
+      ${s.benefit ? `<div class="scheme-benefit">${s.benefit}</div>` : ''}
+      <div class="scheme-desc">${s.desc}</div>
+      ${reasonsHtml ? `<ul class="reasons">${reasonsHtml}</ul>` : ''}
+      <div class="scheme-foot">
+        <span class="scheme-agency">${s.agency}</span>
+        <a class="scheme-link" href="${s.link}" target="_blank" rel="noopener">${t('apply')} →</a>
+      </div>
+    </div>`;
+  }).join('');
+  document.getElementById('stat-matched').textContent = matchedCount + ' / ' + schemeList.length;
+  document.getElementById('stat-cash').textContent = '₹' + cashTotal.toLocaleString('en-IN');
+}
+
+function renderFpoFrom(list, profile){
+  const grid = document.getElementById('fpo-grid');
+  document.getElementById('stat-fpo').textContent = list.length;
+  if(list.length === 0){
+    grid.innerHTML = `
+    <div class="fpo-card pending">
+      <div class="fpo-name">${t('pending')}</div>
+      <div class="fpo-meta">${profile.region} · ${profile.district}</div>
+      <div class="fpo-desc">${t('pendingDesc')}</div>
+      <div class="fpo-foot">
+        <span class="fpo-tag">SFAC</span>
+        <a class="scheme-link" href="https://sfacindia.com/FPOS.aspx" target="_blank" rel="noopener">${t('formFpo')} →</a>
+      </div>
+    </div>`;
+    return;
+  }
+  grid.innerHTML = list.map(f => `
+    <div class="fpo-card">
+      <div class="fpo-name">${f.name}</div>
+      <div class="fpo-meta">${f.loc}</div>
+      <div class="fpo-desc">${f.desc}</div>
+      <div class="fpo-tags">${f.tags.map(tag=>`<span class="fpo-tag">${tag}</span>`).join('')}<span class="fpo-tag">${f.members}</span></div>
+      <div class="fpo-foot">
+        <span class="fpo-meta">${f.crop}</span>
+        <a class="scheme-link" href="${f.link}" target="_blank" rel="noopener">${t('apply')} →</a>
+      </div>
+    </div>`).join('');
+}
+
+function renderSupport(){
+  const grid = document.getElementById('support-grid');
+  const cats = [
+    { key:'insurance', label:{en:'Insurance',hi:'बीमा',mr:'विमा',pa:'ਬੀਮਾ'} },
+    { key:'credit', label:{en:'Credit',hi:'ऋण',mr:'कर्ज',pa:'ਕਰਜ਼ਾ'} },
+    { key:'advisory', label:{en:'Advisory',hi:'सलाहकार',mr:'सल्ला',pa:'ਸਲਾਹਕਾਰ'} }
+  ];
+  grid.innerHTML = cats.map(c => `
+    <div class="support-card">
+      <h3>${c.label[currentLang]||c.label.en}</h3>
+      ${SUPPORT[c.key].map(item => `
+        <div class="support-item">
+          <div class="siname">${item.name}</div>
+          <div class="sidesc">${item.desc}</div>
+          ${item.link ? `<a href="${item.link}" target="_blank" rel="noopener">${item.link.replace('https://','')} →</a>` : ''}
+        </div>`).join('')}
+    </div>`).join('');
+}
+
+async function renderAll(){
+  const profile = PROFILES.find(p => p.id === currentProfileId);
+  renderProfiles();
+
+  const serverData = await fetchMatch(currentProfileId);
+  if(serverData){
+    renderSchemesFrom(serverData.schemes);
+    renderFpoFrom(serverData.fpos, profile);
+  } else {
+    renderSchemesFrom(schemesFromLocal(profile));
+    renderFpoFrom(FPOS[profile.regionKey] || [], profile);
+  }
+  renderSupport();
+}
+
+async function applyLang(code){
+  currentLang = I18N[code] ? code : 'en';
+  document.getElementById('html-root').setAttribute('lang', currentLang);
+  document.querySelectorAll('[data-i18n]').forEach(el => { const v = t(el.getAttribute('data-i18n')); if(v) el.textContent = v; });
+  document.querySelectorAll('.lang-pill').forEach(p => p.classList.toggle('active', p.dataset.lang === currentLang));
+  document.getElementById('back-link').setAttribute('href', 'nexora-first-page.html?lang=' + currentLang);
+  const badge = document.getElementById('api-badge');
+  document.getElementById('api-badge-text').textContent = apiUp ? t('apiLive') : t('apiOffline');
+  await renderAll();
+}
+
+document.querySelectorAll('.lang-pill').forEach(btn => btn.addEventListener('click', () => applyLang(btn.dataset.lang)));
+document.querySelectorAll('.tab-btn').forEach(btn => btn.addEventListener('click', () => {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
+}));
+
+const params = new URLSearchParams(location.search);
+const startLang = params.get('lang');
+(async () => {
+  await checkApi();
+  await applyLang(startLang && I18N[startLang] ? startLang : 'en');
+})();
+</script>
+</body>
+</html>

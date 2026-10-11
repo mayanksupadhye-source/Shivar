@@ -1,0 +1,2309 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Shivar — Farmer Dashboard</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <script src="auth-guard.js"></script>
+    <script src="blockchain.js"></script>
+    <script src="ai-advisor.js"></script>
+    <script src="http://localhost:5000/socket.io/socket.io.js"></script>
+    <script src="api-client.js"></script>
+    <style>
+      *,
+      *::before,
+      *::after {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      :root {
+        --dark: #F0FDF4;
+        --mid: #ffffff;
+        --leaf: #15803D;
+        --lime: #22C55E;
+        --gold: #FF9933;
+        --cream: #17352A;
+        --muted: #526B61;
+        --red: #DC2626;
+        --blue: #2563EB;
+        --sidebar: 260px;
+      }
+      body {
+        font-family: "DM Sans", sans-serif;
+        background: linear-gradient(180deg, #F0FDF4 0%, #F0F9FF 50%, #F0FDF4 100%);
+        color: var(--cream);
+        display: flex;
+        min-height: 100vh;
+      }
+
+      /* ── CUSTOM CURSOR ── */
+      @media (pointer: fine) {
+        body { cursor: none; }
+        a, button, .btn, .metric-card, .sidebar-nav li a { cursor: none; }
+      }
+      #cursor-dot, #cursor-ring {
+        position: fixed; top: 0; left: 0; pointer-events: none; z-index: 9999;
+        border-radius: 50%; transform: translate(-50%,-50%);
+      }
+      #cursor-dot { width: 7px; height: 7px; background: var(--leaf); opacity: 0.9; }
+      #cursor-ring {
+        width: 34px; height: 34px; border: 1.5px solid rgba(21, 128, 61,0.55);
+        transition: width 0.25s, height 0.25s, border-color 0.25s, background 0.25s;
+      }
+      #cursor-ring.hover { width: 58px; height: 58px; border-color: rgba(37, 99, 235,0.7); background: rgba(21, 128, 61,0.08); }
+      @media (max-width: 900px), (pointer: coarse) {
+        #cursor-dot, #cursor-ring { display: none !important; }
+        body, a, button { cursor: auto; }
+      }
+
+      /* ── PRELOADER ── */
+      #preloader {
+        position: fixed; inset: 0; z-index: 10000;
+        background: linear-gradient(160deg, #F0FDF4 0%, #F0F9FF 100%);
+        display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 1rem;
+        transition: opacity 0.6s ease, visibility 0.6s ease;
+      }
+      #preloader .pl-mark {
+        font-family: "Playfair Display", serif; font-size: 2.2rem; font-weight: 900;
+        background: linear-gradient(120deg, #14532D, var(--leaf) 40%, var(--blue) 70%, #14532D);
+        background-size: 300% 100%; -webkit-background-clip: text; background-clip: text; color: transparent;
+        animation: gradientSweep 1.6s ease-in-out infinite;
+      }
+      #preloader .pl-bar { width: 150px; height: 3px; border-radius: 3px; background: rgba(21, 128, 61,0.15); overflow: hidden; }
+      #preloader .pl-bar::after {
+        content: ''; display: block; height: 100%; width: 40%;
+        background: linear-gradient(90deg, var(--leaf), var(--blue));
+        animation: plLoad 1s ease-in-out infinite;
+      }
+      @keyframes plLoad { 0% { transform: translateX(-100%); } 100% { transform: translateX(350%); } }
+      #preloader.done { opacity: 0; visibility: hidden; }
+
+      /* ── GRAIN ── */
+      #page-grain {
+        position: fixed; inset: -20%; z-index: 5; pointer-events: none; opacity: 0.02; mix-blend-mode: multiply;
+        background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+        animation: grainShift 1.2s steps(4) infinite;
+      }
+      @keyframes grainShift {
+        0% { transform: translate(0,0); } 25% { transform: translate(-1%,1%); }
+        50% { transform: translate(1%,-1%); } 75% { transform: translate(-1%,-1%); } 100% { transform: translate(0,0); }
+      }
+
+      /* ── SCROLLBAR ── */
+      ::-webkit-scrollbar { width: 10px; }
+      ::-webkit-scrollbar-track { background: #F0FDF4; }
+      ::-webkit-scrollbar-thumb { background: linear-gradient(180deg, var(--leaf), var(--blue)); border-radius: 10px; }
+      html { scrollbar-color: #15803D #F0FDF4; }
+
+      /* ── ROTATING GLOW BORDER ── */
+      .glow-border { position: relative; }
+      .glow-border::after {
+        content: ''; position: absolute; inset: -1.5px; border-radius: inherit; padding: 1.5px;
+        background: conic-gradient(from 0deg, var(--leaf), var(--blue), var(--gold), var(--leaf));
+        -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+        -webkit-mask-composite: xor; mask-composite: exclude;
+        opacity: 0; transition: opacity 0.3s; pointer-events: none;
+      }
+      .glow-border:hover::after { opacity: 1; }
+      @keyframes spinBorder { to { transform: rotate(360deg); } }
+
+      /* ── CLICK BURST ── */
+      .burst-particle {
+        position: fixed; z-index: 9997; pointer-events: none; font-size: 1rem;
+        animation: burstFly 0.9s ease-out forwards;
+      }
+      @keyframes burstFly { to { transform: translate(var(--bx), var(--by)) rotate(var(--br)); opacity: 0; } }
+
+      /* ── CARD LIFT ── */
+      .metric-card, .order-item {
+        transition: transform 0.25s ease, box-shadow 0.25s ease;
+      }
+      .metric-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 16px 40px rgba(30, 58, 138,0.12);
+      }
+      @keyframes gradientSweep { 0%,100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
+
+      /* SIDEBAR */
+      .sidebar {
+        width: var(--sidebar);
+        background: var(--mid);
+        border-right: 1px solid rgba(21, 128, 61, 0.2);
+        display: flex;
+        flex-direction: column;
+        padding: 2rem 0;
+        position: fixed;
+        top: 0;
+        bottom: 0;
+        left: 0;
+        overflow-y: auto;
+      }
+      .sidebar-logo {
+        font-family: "Playfair Display", serif;
+        font-size: 1.5rem;
+        font-weight: 900;
+        background: linear-gradient(120deg, #14532D, var(--leaf) 40%, var(--blue) 70%, #14532D);
+        background-size: 300% 100%;
+        -webkit-background-clip: text; background-clip: text; color: transparent;
+        animation: gradientSweep 6s ease-in-out infinite;
+        padding: 0 1.8rem 2rem;
+        border-bottom: 1px solid rgba(21, 128, 61, 0.2);
+      }
+      .sidebar-logo span {
+        background: linear-gradient(120deg, #1E3A8A, var(--blue) 60%, var(--leaf));
+        background-size: 300% 100%;
+        -webkit-background-clip: text; background-clip: text; color: transparent;
+        animation: gradientSweep 6s ease-in-out infinite;
+      }
+      .sidebar-label {
+        font-size: 0.68rem;
+        text-transform: uppercase;
+        letter-spacing: 1.5px;
+        color: var(--muted);
+        padding: 1.5rem 1.8rem 0.5rem;
+      }
+      .sidebar-nav {
+        list-style: none;
+        flex: 1;
+        padding: 0.5rem 0;
+      }
+      .sidebar-nav li a {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.75rem 1.8rem;
+        color: var(--muted);
+        text-decoration: none;
+        font-size: 0.9rem;
+        font-weight: 500;
+        transition: all 0.2s;
+        border-left: 3px solid transparent;
+      }
+      .sidebar-nav li a:hover,
+      .sidebar-nav li a.active {
+        color: var(--lime);
+        background: rgba(21, 128, 61, 0.1);
+        border-left-color: var(--lime);
+      }
+      .sidebar-user {
+        margin: 1rem;
+        background: rgba(220, 252, 231, 0.6);
+        border: 1px solid rgba(21, 128, 61, 0.2);
+        border-radius: 12px;
+        padding: 1rem;
+        display: flex;
+        align-items: center;
+        gap: 0.8rem;
+      }
+      .avatar {
+        width: 38px;
+        height: 38px;
+        background: linear-gradient(135deg, var(--leaf), var(--lime));
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1rem;
+        flex-shrink: 0;
+      }
+      .user-name {
+        font-size: 0.88rem;
+        font-weight: 600;
+      }
+      .user-role {
+        font-size: 0.75rem;
+        color: var(--lime);
+      }
+      .logout-btn {
+        display: block;
+        margin: 0 1.8rem 1rem;
+        color: var(--red);
+        font-size: 0.82rem;
+        cursor: pointer;
+        background: none;
+        border: none;
+        text-align: left;
+        padding: 0;
+      }
+      .logout-btn:hover {
+        text-decoration: underline;
+      }
+      /* MAIN */
+      .main {
+        margin-left: var(--sidebar);
+        flex: 1;
+        padding: 2.5rem;
+      }
+      .page-title {
+        font-family: "Playfair Display", serif;
+        font-size: 1.8rem;
+        font-weight: 900;
+        margin-bottom: 0.3rem;
+      }
+      .page-sub {
+        font-size: 0.9rem;
+        color: var(--muted);
+      }
+      /* TABS */
+      .page-tabs {
+        display: flex;
+        gap: 0.5rem;
+        margin: 1.5rem 0;
+        border-bottom: 1px solid rgba(21, 128, 61, 0.2);
+        padding-bottom: 0;
+      }
+      .ptab {
+        padding: 0.6rem 1.2rem;
+        border-radius: 8px 8px 0 0;
+        font-size: 0.88rem;
+        font-weight: 600;
+        cursor: pointer;
+        color: var(--muted);
+        border: 1px solid transparent;
+        border-bottom: none;
+        transition: all 0.2s;
+        background: transparent;
+      }
+      .ptab.active {
+        color: var(--lime);
+        background: var(--mid);
+        border-color: rgba(21, 128, 61, 0.3);
+        border-bottom-color: var(--mid);
+      }
+      /* PANEL */
+      .panel {
+        display: none;
+        animation: fadeUp 0.3s ease both;
+      }
+      .panel.active {
+        display: block;
+      }
+      @keyframes fadeUp {
+        from {
+          opacity: 0;
+          transform: translateY(16px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      @keyframes blink {
+        0%,
+        80%,
+        100% {
+          opacity: 0.2;
+        }
+        40% {
+          opacity: 1;
+        }
+      }
+      /* METRICS */
+      .metrics {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 1.2rem;
+        margin-bottom: 2rem;
+      }
+      .metric-card {
+        background: var(--mid);
+        border: 1px solid rgba(21, 128, 61, 0.2);
+        border-radius: 14px;
+        padding: 1.4rem;
+      }
+      .metric-label {
+        font-size: 0.8rem;
+        color: var(--muted);
+        margin-bottom: 0.5rem;
+      }
+      .metric-val {
+        font-family: "Playfair Display", serif;
+        font-size: 2rem;
+        font-weight: 900;
+      }
+      .metric-val.green {
+        color: var(--lime);
+      }
+      .metric-val.gold {
+        color: var(--gold);
+      }
+      .metric-change {
+        font-size: 0.78rem;
+        margin-top: 0.4rem;
+        color: var(--lime);
+      }
+      /* CARD */
+      .card {
+        background: var(--mid);
+        border: 1px solid rgba(21, 128, 61, 0.2);
+        border-radius: 16px;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+      }
+      .card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1.3rem;
+      }
+      .card-title {
+        font-size: 1rem;
+        font-weight: 700;
+      }
+      .badge {
+        font-size: 0.72rem;
+        font-weight: 600;
+        padding: 0.25rem 0.6rem;
+        border-radius: 4px;
+      }
+      .badge-green {
+        background: rgba(21, 128, 61, 0.2);
+        color: var(--lime);
+      }
+      .badge-gold {
+        background: rgba(255, 153, 51, 0.2);
+        color: var(--gold);
+      }
+      .badge-purple {
+        background: rgba(6, 182, 212, 0.2);
+        color: #06B6D4;
+      }
+      /* GRID */
+      .two-col {
+        display: grid;
+        grid-template-columns: 1fr 380px;
+        gap: 1.5rem;
+      }
+      /* FORM */
+      .fg {
+        margin-bottom: 0.9rem;
+      }
+      .fg label {
+        display: block;
+        font-size: 0.78rem;
+        color: var(--muted);
+        margin-bottom: 0.35rem;
+        font-weight: 500;
+      }
+      .fg input,
+      .fg select,
+      .fg textarea {
+        width: 100%;
+        background: rgba(220, 252, 231, 0.8);
+        border: 1px solid rgba(21, 128, 61, 0.2);
+        border-radius: 8px;
+        padding: 0.7rem 0.9rem;
+        color: var(--cream);
+        font-family: "DM Sans", sans-serif;
+        font-size: 0.88rem;
+        transition: border-color 0.2s;
+      }
+      .fg input:focus,
+      .fg select:focus,
+      .fg textarea:focus {
+        outline: none;
+        border-color: var(--lime);
+      }
+      .fg select option {
+        background: var(--dark);
+      }
+      .form-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.8rem;
+      }
+      .btn {
+        padding: 0.65rem 1.3rem;
+        border-radius: 8px;
+        font-size: 0.88rem;
+        font-weight: 600;
+        cursor: pointer;
+        border: none;
+        transition: all 0.2s;
+      }
+      .btn-green {
+        background: linear-gradient(135deg, var(--leaf), var(--lime));
+        color: #fff;
+      }
+      .btn-green:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 6px 20px rgba(21, 128, 61, 0.4);
+      }
+      .btn-outline {
+        background: transparent;
+        border: 1px solid rgba(21, 128, 61, 0.4);
+        color: var(--lime);
+      }
+      /* CROP TABLE */
+      .crop-table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      .crop-table th {
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.8px;
+        color: var(--muted);
+        text-align: left;
+        padding: 0.5rem 0.8rem;
+        border-bottom: 1px solid rgba(30, 58, 138, 0.06);
+      }
+      .crop-table td {
+        padding: 0.85rem 0.8rem;
+        border-bottom: 1px solid rgba(30, 58, 138, 0.04);
+        font-size: 0.9rem;
+        vertical-align: middle;
+      }
+      .status-pill {
+        padding: 0.2rem 0.65rem;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 600;
+      }
+      .status-active {
+        background: rgba(21, 128, 61, 0.2);
+        color: var(--lime);
+      }
+      .status-sold {
+        background: rgba(37, 99, 235, 0.2);
+        color: var(--blue);
+      }
+      .status-inactive {
+        background: rgba(82, 107, 97, 0.2);
+        color: var(--muted);
+      }
+      /* MESSAGES */
+      .msg-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.8rem;
+      }
+      .msg-item {
+        background: rgba(220, 252, 231, 0.6);
+        border: 1px solid rgba(21, 128, 61, 0.15);
+        border-radius: 10px;
+        padding: 1rem 1.1rem;
+        display: flex;
+        gap: 1rem;
+        align-items: flex-start;
+        cursor: pointer;
+        transition: border-color 0.2s;
+      }
+      .msg-item:hover {
+        border-color: rgba(21, 128, 61, 0.4);
+      }
+      .msg-item.unread {
+        border-left: 3px solid var(--lime);
+      }
+      .msg-avatar-sm {
+        width: 38px;
+        height: 38px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, var(--leaf), var(--lime));
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.1rem;
+        flex-shrink: 0;
+      }
+      .msg-content h5 {
+        font-size: 0.88rem;
+        font-weight: 600;
+        margin-bottom: 0.2rem;
+      }
+      .msg-content p {
+        font-size: 0.8rem;
+        color: var(--muted);
+      }
+      .msg-time {
+        font-size: 0.72rem;
+        color: var(--muted);
+        margin-left: auto;
+        flex-shrink: 0;
+      }
+      .msg-thread {
+        display: none;
+        margin-top: 0.8rem;
+      }
+      .msg-bubble {
+        padding: 0.7rem 0.9rem;
+        border-radius: 10px;
+        font-size: 0.85rem;
+        margin-bottom: 0.6rem;
+        max-width: 80%;
+        line-height: 1.5;
+      }
+      .msg-bubble.farmer {
+        background: rgba(37, 99, 235, 0.15);
+        border: 1px solid rgba(37, 99, 235, 0.2);
+        margin-left: auto;
+      }
+      .msg-bubble.buyer {
+        background: rgba(21, 128, 61, 0.15);
+        border: 1px solid rgba(21, 128, 61, 0.2);
+      }
+      .msg-reply {
+        display: flex;
+        gap: 0.6rem;
+        margin-top: 0.8rem;
+      }
+      .msg-reply input {
+        flex: 1;
+        background: rgba(220, 252, 231, 0.8);
+        border: 1px solid rgba(21, 128, 61, 0.25);
+        border-radius: 8px;
+        padding: 0.6rem 0.9rem;
+        color: var(--cream);
+        font-family: "DM Sans", sans-serif;
+        font-size: 0.85rem;
+      }
+      .msg-reply input:focus {
+        outline: none;
+        border-color: var(--lime);
+      }
+      .status-bid {
+        background: rgba(255, 153, 51, 0.2);
+        color: var(--gold);
+      }
+      /* BIDS */
+      .bid-item {
+        background: rgba(220, 252, 231, 0.6);
+        border: 1px solid rgba(21, 128, 61, 0.2);
+        border-radius: 10px;
+        padding: 1rem;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        margin-bottom: 0.8rem;
+      }
+      .bid-avatar {
+        width: 36px;
+        height: 36px;
+        background: linear-gradient(135deg, #1E3A8A, #2563EB);
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1rem;
+        flex-shrink: 0;
+      }
+      .bid-price {
+        font-family: "Playfair Display", serif;
+        font-size: 1.1rem;
+        font-weight: 700;
+        color: var(--gold);
+      }
+      .bid-accept {
+        background: var(--leaf);
+        color: #fff;
+        border: none;
+        padding: 0.3rem 0.7rem;
+        border-radius: 6px;
+        font-size: 0.78rem;
+        cursor: pointer;
+        font-weight: 600;
+      }
+      .bid-decline {
+        background: transparent;
+        border: 1px solid rgba(30, 58, 138, 0.1);
+        color: var(--muted);
+        padding: 0.3rem 0.7rem;
+        border-radius: 6px;
+        font-size: 0.78rem;
+        cursor: pointer;
+      }
+      /* AI FORM */
+      .ai-form-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.8rem;
+      }
+      /* BLOCKCHAIN */
+      #bc-history {
+        max-height: 500px;
+        overflow-y: auto;
+      }
+      /* TOAST */
+      .toast {
+        position: fixed;
+        bottom: 2rem;
+        right: 2rem;
+        background: var(--mid);
+        border: 1px solid rgba(21, 128, 61, 0.4);
+        border-radius: 12px;
+        padding: 1rem 1.3rem;
+        font-size: 0.88rem;
+        transform: translateY(100px);
+        opacity: 0;
+        transition: all 0.4s;
+        z-index: 999;
+        display: flex;
+        align-items: center;
+        gap: 0.7rem;
+      }
+      .toast.show {
+        transform: translateY(0);
+        opacity: 1;
+      }
+      @media (max-width: 900px) {
+        .sidebar {
+          display: none;
+        }
+        .main {
+          margin-left: 0;
+          padding: 1.5rem;
+        }
+        .metrics {
+          grid-template-columns: repeat(2, 1fr);
+        }
+        .two-col {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="preloader"><div class="pl-mark">Shivar</div><div class="pl-bar"></div></div>
+    <div id="cursor-dot"></div>
+    <div id="cursor-ring"></div>
+    <div id="page-grain"></div>
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+      <div class="sidebar-logo">Shiv<span>ar</span></div>
+      <div class="sidebar-label">Farmer Portal</div>
+      <ul class="sidebar-nav">
+        <li>
+          <a href="#" class="active" onclick="showPanel('overview')"
+            >🏠 Dashboard</a
+          >
+        </li>
+        <li><a href="#" onclick="showPanel('listings')">🌾 My Listings</a></li>
+        <li><a href="#" onclick="showPanel('bids')">📋 Active Bids</a></li>
+        <li><a href="#" onclick="showPanel('messages')">💬 Messages</a></li>
+        <li><a href="#" onclick="showPanel('ai')">🤖 AI Advisor</a></li>
+        <li>
+          <a href="#" onclick="showPanel('blockchain')"
+            >⛓️ Blockchain Records</a
+          >
+        </li>
+        <li><a href="#" onclick="showPanel('profile')">👤 My Profile</a></li>
+        <li><a href="#" onclick="showPanel('market')">📈 Market Intelligence</a></li>
+        <li><a href="#" onclick="showPanel('climate')">🌦️ Climate Intelligence</a></li>
+        <li><a href="#" onclick="showPanel('ecosystem')">🌱 Ecosystem Intelligence</a></li>
+      </ul>
+      <button class="logout-btn" data-action="logout">🚪 Logout</button>
+      <div class="sidebar-user">
+        <div class="avatar">👨‍🌾</div>
+        <div>
+          <div class="user-name">Loading...</div>
+          <div class="user-role">Farmer</div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- MAIN -->
+    <main class="main">
+      <div class="page-title" id="page-title">Good morning, Farmer 🌾</div>
+      <p class="page-sub" id="page-sub">Your farm intelligence dashboard</p>
+
+      <!-- PAGE TABS -->
+      <div class="page-tabs">
+        <div class="ptab active" onclick="showPanel('overview')">Overview</div>
+        <div class="ptab" onclick="showPanel('listings')">My Listings</div>
+        <div class="ptab" onclick="showPanel('bids')">Bids</div>
+        <div class="ptab" onclick="showPanel('messages')">💬 Messages</div>
+        <div class="ptab" onclick="showPanel('ai')">🤖 AI Advisor</div>
+        <div class="ptab" onclick="showPanel('blockchain')">⛓️ Blockchain</div>
+        <div class="ptab" onclick="showPanel('profile')">Profile</div>
+        <div class="ptab" onclick="showPanel('market')">📈 Market Intel</div>
+        <div class="ptab" onclick="showPanel('climate')">🌦️ Climate</div>
+        <div class="ptab" onclick="showPanel('ecosystem')">🌱 Ecosystem</div>
+      </div>
+
+      <!-- ══════════ OVERVIEW ══════════ -->
+      <div id="panel-overview" class="panel active">
+        <div class="metrics">
+          <div class="metric-card glow-border">
+            <div class="metric-label">Total Earnings</div>
+            <div class="metric-val gold">₹4.2L</div>
+            <div class="metric-change">↑ 34% vs last season</div>
+          </div>
+          <div class="metric-card glow-border">
+            <div class="metric-label">Active Listings</div>
+            <div class="metric-val green" id="listing-count">0</div>
+            <div class="metric-change">Update live</div>
+          </div>
+          <div class="metric-card glow-border">
+            <div class="metric-label">Blockchain Records</div>
+            <div class="metric-val green" id="bc-count">0</div>
+            <div class="metric-change">Immutable records</div>
+          </div>
+          <div class="metric-card glow-border">
+            <div class="metric-label">Avg Price Gain</div>
+            <div class="metric-val green">+62%</div>
+            <div class="metric-change">vs middlemen price</div>
+          </div>
+        </div>
+        <div class="two-col">
+          <div>
+            <div class="card">
+              <div class="card-header">
+                <span class="card-title">My Crop Listings</span
+                ><span class="badge badge-green" id="overview-listing-badge"
+                  >Live</span
+                >
+              </div>
+              <table class="crop-table" id="overview-table">
+                <thead>
+                  <tr>
+                    <th>Crop</th>
+                    <th>Qty</th>
+                    <th>Price</th>
+                    <th>Status</th>
+                    <th>Chain</th>
+                  </tr>
+                </thead>
+                <tbody id="overview-tbody">
+                  <tr>
+                    <td
+                      colspan="5"
+                      style="
+                        text-align: center;
+                        color: var(--muted);
+                        padding: 1.5rem;
+                      "
+                    >
+                      No listings yet. Add your first crop!
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div>
+            <div class="card">
+              <div class="card-header">
+                <span class="card-title">Incoming Bids</span
+                ><span class="badge badge-gold" id="overview-bids-badge"
+                  >0 New</span
+                >
+              </div>
+              <div id="overview-bids-preview">
+                <p style="color: var(--muted); padding: 0.5rem 0">Loading…</p>
+              </div>
+            </div>
+            <!-- QUICK LIST CROP -->
+            <div class="card">
+              <div class="card-header">
+                <span class="card-title">Quick List Crop</span>
+              </div>
+              <div class="fg" style="position: relative">
+                <label>Crop Type</label>
+                <input
+                  type="text"
+                  id="q-crop-search"
+                  placeholder="Type to search e.g. Strawberry"
+                  autocomplete="off"
+                  oninput="filterQCropList()"
+                  onfocus="showQCropList()"
+                  style="
+                    width: 100%;
+                    background: rgba(220, 252, 231, 0.8);
+                    border: 1px solid rgba(21, 128, 61, 0.25);
+                    border-radius: 8px;
+                    padding: 0.6rem 0.9rem;
+                    color: var(--text-main, #17352A);
+                    font-family: &quot;DM Sans&quot;, sans-serif;
+                    font-size: 0.85rem;
+                  "
+                />
+                <input type="hidden" id="q-crop" value="Cotton" />
+                <div
+                  id="q-crop-dropdown"
+                  style="
+                    display: none;
+                    position: absolute;
+                    z-index: 50;
+                    top: 100%;
+                    left: 0;
+                    right: 0;
+                    background: #ffffff;
+                    border: 1px solid rgba(21, 128, 61, 0.35);
+                    border-radius: 8px;
+                    max-height: 220px;
+                    overflow-y: auto;
+                    margin-top: 4px;
+                    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+                  "
+                ></div>
+              </div>
+              <div class="form-row">
+                <div class="fg">
+                  <label>Quantity (qtl)</label
+                  ><input type="number" id="q-qty" placeholder="100" />
+                </div>
+                <div class="fg">
+                  <label>Price (₹/qtl)</label
+                  ><input type="number" id="q-price" placeholder="14500" />
+                </div>
+              </div>
+              <div class="fg">
+                <label>Location</label
+                ><input
+                  type="text"
+                  id="q-loc"
+                  placeholder="Village, District"
+                />
+              </div>
+              <button
+                class="btn btn-green"
+                style="width: 100%"
+                onclick="listCrop()"
+              >
+                🌾 List Crop + Record on Blockchain →
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══════════ AI ADVISOR ══════════ -->
+      <div id="panel-ai" class="panel">
+        <div class="two-col" style="grid-template-columns: 380px 1fr">
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">🤖 ShivarAI — Crop Advisor</span
+              ><span class="badge badge-purple">GPT-4 Powered</span>
+            </div>
+            <p
+              style="
+                font-size: 0.85rem;
+                color: var(--muted);
+                margin-bottom: 1.2rem;
+              "
+            >
+              Enter your farm details for AI-powered disease detection, soil
+              analysis & yield advice.
+            </p>
+
+            <!-- API KEY SETTING -->
+            <div
+              style="
+                background: rgba(37, 99, 235, 0.1);
+                border: 1px solid rgba(37, 99, 235, 0.25);
+                border-radius: 8px;
+                padding: 0.8rem;
+                margin-bottom: 1.2rem;
+                display: flex;
+                gap: 0.7rem;
+                align-items: center;
+                flex-wrap: wrap;
+              "
+            >
+              <!-- <span style="font-size: 0.78rem; color: #1E3A8A; flex-shrink: 0"
+                >🔑 OpenAI Key:</span
+              >
+              <input
+                type="password"
+                id="ai-key-input"
+                placeholder="sk-... (optional, uses smart fallback if empty)"
+                style="
+                  flex: 1;
+                  min-width: 200px;
+                  background: rgba(220, 252, 231, 0.8);
+                  border: 1px solid rgba(37, 99, 235, 0.3);
+                  border-radius: 6px;
+                  padding: 0.4rem 0.7rem;
+                  color: var(--cream);
+                  font-size: 0.78rem;
+                "
+              /> -->
+              <!-- <button
+                onclick="saveAIKey()"
+                style="
+                  background: var(--blue);
+                  color: #fff;
+                  border: none;
+                  border-radius: 6px;
+                  padding: 0.4rem 0.8rem;
+                  font-size: 0.78rem;
+                  cursor: pointer;
+                "
+              >
+                Save
+              </button> -->
+            </div>
+
+            <form id="ai-advisor-form" onsubmit="return false;">
+              <div class="ai-form-grid">
+                <div class="fg">
+                  <label>Crop Type *</label
+                  ><select name="crop">
+                    <option value="">Select</option>
+                    <option>Cotton</option>
+                    <option>Wheat</option>
+                    <option>Soybean</option>
+                    <option>Sugarcane</option>
+                    <option>Turmeric</option>
+                    <option>Rice</option>
+                    <option>Onion</option>
+                  </select>
+                </div>
+                <div class="fg">
+                  <label>Soil Type</label
+                  ><select name="soilType">
+                    <option value="">Select</option>
+                    <option>Black Cotton Soil</option>
+                    <option>Sandy Loam</option>
+                    <option>Red Soil</option>
+                    <option>Alluvial</option>
+                    <option>Laterite</option>
+                  </select>
+                </div>
+                <div class="fg">
+                  <label>Rainfall (mm)</label
+                  ><input
+                    type="number"
+                    name="rainfall"
+                    placeholder="e.g. 650"
+                  />
+                </div>
+                <div class="fg">
+                  <label>Temperature (°C)</label
+                  ><input
+                    type="number"
+                    name="temperature"
+                    placeholder="e.g. 32"
+                  />
+                </div>
+                <div class="fg">
+                  <label>Fertilizer Used</label
+                  ><input
+                    type="text"
+                    name="fertilizer"
+                    placeholder="e.g. DAP + Urea"
+                  />
+                </div>
+                <div class="fg">
+                  <label>Region/District</label
+                  ><input
+                    type="text"
+                    name="region"
+                    placeholder="e.g. Nashik, Maharashtra"
+                  />
+                </div>
+                <div class="fg">
+                  <label>Leaf Symptoms</label
+                  ><input
+                    type="text"
+                    name="leafSymptoms"
+                    placeholder="e.g. Yellow spots, wilting"
+                  />
+                </div>
+                <div class="fg">
+                  <label>Pest Symptoms</label
+                  ><input
+                    type="text"
+                    name="pestSymptoms"
+                    placeholder="e.g. Holes in leaves, webbing"
+                  />
+                </div>
+              </div>
+              <div class="fg">
+                <label>Season</label
+                ><select name="season">
+                  <option>Kharif</option>
+                  <option>Rabi</option>
+                  <option>Zaid</option>
+                </select>
+              </div>
+              <button
+                class="btn btn-green"
+                style="width: 100%; margin-top: 0.5rem"
+                onclick="AIAdvisorUI.run('ai-advisor-form', 'ai-result')"
+              >
+                🔬 Analyze My Farm →
+              </button>
+            </form>
+          </div>
+          <div
+            id="ai-result"
+            style="
+              background: var(--mid);
+              border: 1px solid rgba(21, 128, 61, 0.2);
+              border-radius: 16px;
+              padding: 1.5rem;
+            "
+          >
+            <div style="text-align: center; padding: 3rem 1rem">
+              <div style="font-size: 3rem; margin-bottom: 1rem">🌱</div>
+              <p style="color: var(--muted); font-size: 0.9rem">
+                Fill the form and click Analyze to get<br />AI-powered
+                recommendations for your farm.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══════════ BLOCKCHAIN ══════════ -->
+      <div id="panel-blockchain" class="panel">
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">⛓️ Shivar Blockchain Records</span>
+            <div style="display: flex; gap: 0.6rem; align-items: center">
+              <span class="badge badge-green" id="chain-valid-badge"
+                >✓ Chain Valid</span
+              >
+              <button
+                class="btn btn-outline"
+                onclick="refreshBlockchain()"
+                style="padding: 0.4rem 0.8rem; font-size: 0.78rem"
+              >
+                🔄 Refresh
+              </button>
+              <button
+                onclick="clearChainDemo()"
+                style="
+                  background: transparent;
+                  border: 1px solid rgba(220, 38, 38, 0.3);
+                  color: var(--red);
+                  padding: 0.4rem 0.8rem;
+                  border-radius: 8px;
+                  font-size: 0.78rem;
+                  cursor: pointer;
+                "
+              >
+                🗑️ Reset (Demo)
+              </button>
+            </div>
+          </div>
+          <!-- CHAIN STATS -->
+          <div
+            style="
+              display: grid;
+              grid-template-columns: repeat(4, 1fr);
+              gap: 1rem;
+              margin-bottom: 1.5rem;
+            "
+          >
+            <div
+              style="
+                background: rgba(220, 252, 231, 0.6);
+                border-radius: 10px;
+                padding: 1rem;
+                text-align: center;
+              "
+            >
+              <div
+                style="
+                  font-family: &quot;Playfair Display&quot;, serif;
+                  font-size: 1.8rem;
+                  font-weight: 900;
+                  color: var(--lime);
+                "
+                id="bc-total"
+              >
+                0
+              </div>
+              <div style="font-size: 0.75rem; color: var(--muted)">
+                Total Blocks
+              </div>
+            </div>
+            <div
+              style="
+                background: rgba(220, 252, 231, 0.6);
+                border-radius: 10px;
+                padding: 1rem;
+                text-align: center;
+              "
+            >
+              <div
+                style="
+                  font-family: &quot;Playfair Display&quot;, serif;
+                  font-size: 1.8rem;
+                  font-weight: 900;
+                  color: var(--gold);
+                "
+                id="bc-crops"
+              >
+                0
+              </div>
+              <div style="font-size: 0.75rem; color: var(--muted)">
+                Crop Records
+              </div>
+            </div>
+            <div
+              style="
+                background: rgba(220, 252, 231, 0.6);
+                border-radius: 10px;
+                padding: 1rem;
+                text-align: center;
+              "
+            >
+              <div
+                style="
+                  font-family: &quot;Playfair Display&quot;, serif;
+                  font-size: 1.8rem;
+                  font-weight: 900;
+                  color: #1E3A8A;
+                "
+                id="bc-txns"
+              >
+                0
+              </div>
+              <div style="font-size: 0.75rem; color: var(--muted)">
+                Transactions
+              </div>
+            </div>
+            <div
+              style="
+                background: rgba(220, 252, 231, 0.6);
+                border-radius: 10px;
+                padding: 1rem;
+                text-align: center;
+              "
+            >
+              <div
+                style="
+                  font-family: &quot;Playfair Display&quot;, serif;
+                  font-size: 1.8rem;
+                  font-weight: 900;
+                  color: #06B6D4;
+                "
+                id="bc-ai"
+              >
+                0
+              </div>
+              <div style="font-size: 0.75rem; color: var(--muted)">
+                AI Consultations
+              </div>
+            </div>
+          </div>
+          <!-- FILTER -->
+          <div
+            style="
+              display: flex;
+              gap: 0.6rem;
+              margin-bottom: 1.2rem;
+              flex-wrap: wrap;
+            "
+          >
+            <button
+              onclick="filterBC('all')"
+              class="bc-filter-btn active"
+              style="
+                padding: 0.35rem 0.8rem;
+                border-radius: 6px;
+                font-size: 0.78rem;
+                font-weight: 600;
+                cursor: pointer;
+                border: 1px solid rgba(21, 128, 61, 0.4);
+                background: rgba(21, 128, 61, 0.2);
+                color: var(--lime);
+              "
+            >
+              All
+            </button>
+            <button
+              onclick="filterBC('CROP_REGISTRATION')"
+              class="bc-filter-btn"
+              style="
+                padding: 0.35rem 0.8rem;
+                border-radius: 6px;
+                font-size: 0.78rem;
+                cursor: pointer;
+                border: 1px solid rgba(21, 128, 61, 0.2);
+                background: transparent;
+                color: var(--muted);
+              "
+            >
+              🌾 Crops
+            </button>
+            <button
+              onclick="filterBC('BUYER_TRANSACTION')"
+              class="bc-filter-btn"
+              style="
+                padding: 0.35rem 0.8rem;
+                border-radius: 6px;
+                font-size: 0.78rem;
+                cursor: pointer;
+                border: 1px solid rgba(21, 128, 61, 0.2);
+                background: transparent;
+                color: var(--muted);
+              "
+            >
+              💰 Transactions
+            </button>
+            <button
+              onclick="filterBC('AI_CONSULTATION')"
+              class="bc-filter-btn"
+              style="
+                padding: 0.35rem 0.8rem;
+                border-radius: 6px;
+                font-size: 0.78rem;
+                cursor: pointer;
+                border: 1px solid rgba(21, 128, 61, 0.2);
+                background: transparent;
+                color: var(--muted);
+              "
+            >
+              🤖 AI Logs
+            </button>
+          </div>
+          <div id="bc-history"></div>
+        </div>
+      </div>
+
+      <!-- ══════════ MARKET INTELLIGENCE ══════════ -->
+      <div id="panel-market" class="panel">
+        <div class="card" style="padding: 0; overflow: hidden">
+          <div class="card-header" style="padding: 1.2rem 1.5rem 0.8rem">
+            <span class="card-title">📈 Market Intelligence — AI Price Estimate</span>
+            <span class="badge badge-gold">Live — ML Model</span>
+          </div>
+          <p
+            style="
+              font-size: 0.85rem;
+              color: var(--muted);
+              padding: 0 1.5rem 1rem;
+            "
+          >
+            Model-estimated pricing and typical market bands for your crop,
+            grounded in historical listings for this region.
+          </p>
+          <iframe
+            id="market-frame"
+            src="market-intelligence-embed.html"
+            title="Market Intelligence"
+            style="
+              width: 100%;
+              height: 82vh;
+              border: none;
+              display: block;
+              background: transparent;
+            "
+            loading="lazy"
+          ></iframe>
+        </div>
+      </div>
+
+      <!-- ══════════ CLIMATE INTELLIGENCE ══════════ -->
+      <div id="panel-climate" class="panel">
+        <div class="card" style="padding: 0; overflow: hidden">
+          <div class="card-header" style="padding: 1.2rem 1.5rem 0.8rem">
+            <span class="card-title">🌦️ Climate Intelligence</span>
+            <span class="badge badge-green">Live — Open-Meteo</span>
+          </div>
+          <p
+            style="
+              font-size: 0.85rem;
+              color: var(--muted);
+              padding: 0 1.5rem 1rem;
+            "
+          >
+            Live forecast, soil conditions, and crop risk for this farm's
+            location.
+          </p>
+          <iframe
+            id="climate-frame"
+            src="climate-intelligence-embed.html"
+            title="Climate Intelligence"
+            style="
+              width: 100%;
+              height: 82vh;
+              border: none;
+              display: block;
+              background: transparent;
+            "
+            loading="lazy"
+          ></iframe>
+        </div>
+      </div>
+
+      <!-- ══════════ ECOSYSTEM INTELLIGENCE ══════════ -->
+      <div id="panel-ecosystem" class="panel">
+        <div class="card" style="padding: 0; overflow: hidden">
+          <div class="card-header" style="padding: 1.2rem 1.5rem 0.8rem">
+            <span class="card-title">🌱 Ecosystem Intelligence</span>
+            <span class="badge badge-green">Schemes · FPOs · Support</span>
+          </div>
+          <p
+            style="
+              font-size: 0.85rem;
+              color: var(--muted);
+              padding: 0 1.5rem 1rem;
+            "
+          >
+            Government schemes, FPO networks, and support services this farm
+            qualifies for.
+          </p>
+          <iframe
+            id="ecosystem-frame"
+            src="ecosystem-intelligence-embed.html"
+            title="Ecosystem Intelligence"
+            style="
+              width: 100%;
+              height: 82vh;
+              border: none;
+              display: block;
+              background: transparent;
+            "
+            loading="lazy"
+          ></iframe>
+        </div>
+      </div>
+
+      <!-- ══════════ PROFILE ══════════ -->
+      <div id="panel-profile" class="panel">
+        <div class="two-col">
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">👤 My Profile</span
+              ><span class="badge badge-green">Verified Farmer</span>
+            </div>
+            <div id="profile-content" style="font-size: 0.9rem"></div>
+          </div>
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">🔐 Security</span>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 0.8rem">
+              <div
+                style="
+                  background: rgba(220, 252, 231, 0.6);
+                  border-radius: 10px;
+                  padding: 1rem;
+                  display: flex;
+                  justify-content: space-between;
+                  align-items: center;
+                "
+              >
+                <div>
+                  <div style="font-size: 0.88rem; font-weight: 600">
+                    Aadhaar
+                  </div>
+                  <div
+                    style="font-size: 0.78rem; color: var(--muted)"
+                    id="aadhaar-display"
+                  >
+                    XXXX XXXX XXXX
+                  </div>
+                </div>
+                <span
+                  style="
+                    font-size: 0.72rem;
+                    padding: 0.2rem 0.5rem;
+                    border-radius: 4px;
+                    background: rgba(37, 99, 235, 0.2);
+                    color: #1E3A8A;
+                  "
+                  >AES-256 Encrypted</span
+                >
+              </div>
+              <div
+                style="
+                  background: rgba(220, 252, 231, 0.6);
+                  border-radius: 10px;
+                  padding: 1rem;
+                  display: flex;
+                  justify-content: space-between;
+                  align-items: center;
+                "
+              >
+                <div>
+                  <div style="font-size: 0.88rem; font-weight: 600">
+                    Session Token
+                  </div>
+                  <div
+                    style="
+                      font-size: 0.72rem;
+                      color: var(--muted);
+                      font-family: monospace;
+                    "
+                    id="token-display"
+                  >
+                    Loading...
+                  </div>
+                </div>
+                <span
+                  style="
+                    font-size: 0.72rem;
+                    padding: 0.2rem 0.5rem;
+                    border-radius: 4px;
+                    background: rgba(21, 128, 61, 0.2);
+                    color: var(--lime);
+                  "
+                  >JWT Active</span
+                >
+              </div>
+              <div
+                style="
+                  background: rgba(220, 252, 231, 0.6);
+                  border-radius: 10px;
+                  padding: 1rem;
+                  display: flex;
+                  justify-content: space-between;
+                  align-items: center;
+                "
+              >
+                <div>
+                  <div style="font-size: 0.88rem; font-weight: 600">Role</div>
+                  <div style="font-size: 0.78rem; color: var(--muted)">
+                    Farmer — Protected Routes Active
+                  </div>
+                </div>
+                <span
+                  style="
+                    font-size: 0.72rem;
+                    padding: 0.2rem 0.5rem;
+                    border-radius: 4px;
+                    background: rgba(21, 128, 61, 0.2);
+                    color: var(--lime);
+                  "
+                  >RBAC ✓</span
+                >
+              </div>
+              <button class="btn btn-outline" onclick="AuthGuard.logout()">
+                🚪 Logout Securely
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══════════ LISTINGS / BIDS PANELS ══════════ -->
+      <div id="panel-listings" class="panel">
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">All My Crop Listings</span>
+          </div>
+          <table class="crop-table">
+            <thead>
+              <tr>
+                <th>Crop</th>
+                <th>Qty</th>
+                <th>Price</th>
+                <th>Location</th>
+                <th>Status</th>
+                <th>Blockchain</th>
+              </tr>
+            </thead>
+            <tbody id="full-listings-tbody">
+              <tr>
+                <td
+                  colspan="6"
+                  style="text-align: center; color: var(--muted); padding: 2rem"
+                >
+                  No listings yet.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div id="panel-bids" class="panel">
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">All Incoming Bids</span
+            ><span class="badge badge-gold" id="bids-active-badge"
+              >0 Active</span
+            >
+          </div>
+          <div id="bids-list-container">
+            <p style="color: var(--muted); padding: 1rem">Loading bids…</p>
+          </div>
+        </div>
+      </div>
+
+      <div id="panel-messages" class="panel">
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Conversations</span
+            ><span class="badge badge-gold" id="unread-badge">All Read</span>
+          </div>
+          <div class="msg-list" id="messages-list">
+            <p style="color: var(--muted); padding: 1rem">Loading…</p>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <div class="toast" id="toast">
+      <span id="toast-icon">✅</span><span id="toast-msg">Done!</span>
+    </div>
+
+    <script>
+      // ── AUTH GUARD ── real check: redirects to login if not a verified farmer
+      if (!AuthGuard.require("farmer")) {
+        // require() already redirects; stop executing the rest of this script
+        throw new Error("Not authenticated");
+      }
+
+      // ── INIT ──
+      window.addEventListener("DOMContentLoaded", async () => {
+        const user = AuthGuard.getUser();
+        const hour = new Date().getHours();
+        const greeting =
+          hour < 12
+            ? "Good morning"
+            : hour < 17
+              ? "Good afternoon"
+              : "Good evening";
+        document.getElementById("page-title").textContent =
+          `${greeting}, ${user.name} 🌾`;
+        AuthGuard.injectUserBadge(user);
+        updateProfilePanel(user);
+        refreshCounts();
+        loadListingsTable();
+        loadBidsPanel();
+        await loadConversationsFromBids();
+        renderMessages();
+        NexoraSocket.onMessage(handleIncomingMessage);
+      });
+
+      // ── PANEL NAVIGATION ──
+      function showPanel(id) {
+        document
+          .querySelectorAll(".panel")
+          .forEach((p) => p.classList.remove("active"));
+        document
+          .querySelectorAll(".ptab")
+          .forEach((t) => t.classList.remove("active"));
+        document.getElementById(`panel-${id}`).classList.add("active");
+        const tabs = [
+          "overview",
+          "listings",
+          "bids",
+          "messages",
+          "ai",
+          "blockchain",
+          "profile",
+          "market",
+          "climate",
+          "ecosystem",
+        ];
+        const idx = tabs.indexOf(id);
+        document.querySelectorAll(".ptab")[idx]?.classList.add("active");
+        document
+          .querySelectorAll(".sidebar-nav a")
+          .forEach((a) => a.classList.remove("active"));
+        if (id === "blockchain") refreshBlockchain();
+        if (id === "profile") {
+          const token = AuthGuard.getToken() || "No token";
+          document.getElementById("token-display").textContent =
+            token.slice(0, 30) + "...";
+        }
+      }
+
+      // ── CROP LIST (searchable dropdown) — Quick List Crop form ──
+      const Q_CROP_LIST = [
+        // Cereals
+        "Rice",
+        "Wheat",
+        "Maize",
+        "Bajra (Pearl Millet)",
+        "Jowar (Sorghum)",
+        "Ragi (Finger Millet)",
+        "Barley",
+        // Pulses
+        "Chickpea (Gram)",
+        "Pigeon Pea (Tur/Arhar)",
+        "Black Gram (Urad)",
+        "Green Gram (Moong)",
+        "Lentil (Masoor)",
+        "Kidney Beans (Rajma)",
+        "Cowpea (Lobia)",
+        "Horse Gram",
+        "Field Peas",
+        // Oilseeds
+        "Groundnut",
+        "Soybean",
+        "Sunflower",
+        "Mustard",
+        "Sesame (Til)",
+        "Castor",
+        "Safflower",
+        "Linseed",
+        "Niger Seed",
+        // Cash / Fibre crops
+        "Cotton",
+        "Sugarcane",
+        "Jute",
+        "Tobacco",
+        "Hemp",
+        "Mesta",
+        // Spices
+        "Turmeric",
+        "Chili",
+        "Black Pepper",
+        "Cardamom",
+        "Coriander",
+        "Cumin",
+        "Fennel",
+        "Fenugreek Seed",
+        "Ginger",
+        "Garlic",
+        "Clove",
+        "Cinnamon",
+        "Nutmeg",
+        "Asafoetida (Hing)",
+        "Star Anise",
+        "Vanilla",
+        // Plantation crops
+        "Tea",
+        "Coffee",
+        "Rubber",
+        "Coconut",
+        "Areca Nut",
+        "Cocoa",
+        // Fruits
+        "Mango",
+        "Banana",
+        "Grapes",
+        "Orange",
+        "Sweet Lime (Mosambi)",
+        "Pomegranate",
+        "Guava",
+        "Papaya",
+        "Apple",
+        "Pear",
+        "Peach",
+        "Plum",
+        "Litchi",
+        "Sapota (Chikoo)",
+        "Watermelon",
+        "Muskmelon",
+        "Pineapple",
+        "Strawberry",
+        "Custard Apple (Sitaphal)",
+        "Jackfruit",
+        "Fig",
+        "Dragon Fruit",
+        "Kiwi",
+        "Dates",
+        "Amla (Indian Gooseberry)",
+        "Jamun",
+        "Ber (Indian Jujube)",
+        "Lemon",
+        "Avocado",
+        // Vegetables
+        "Onion",
+        "Potato",
+        "Tomato",
+        "Brinjal (Eggplant)",
+        "Cabbage",
+        "Cauliflower",
+        "Okra (Bhindi)",
+        "Green Peas",
+        "Carrot",
+        "Radish",
+        "Beetroot",
+        "Spinach",
+        "Fenugreek Leaves (Methi)",
+        "Bottle Gourd",
+        "Bitter Gourd",
+        "Ridge Gourd",
+        "Pumpkin",
+        "Cucumber",
+        "Capsicum",
+        "Green Chili",
+        "Sweet Potato",
+        "Tapioca",
+        "French Beans",
+        "Cluster Beans (Guar)",
+        "Drumstick (Moringa)",
+        "Colocasia (Arbi)",
+        "Ash Gourd",
+        "Garlic Greens",
+        "Lettuce",
+        "Broccoli",
+        // Sugar / Others
+        "Sugar Beet",
+        "Betel Leaf (Paan)",
+        "Mushroom",
+      ];
+
+      function renderQCropList(filter = "") {
+        const dd = document.getElementById("q-crop-dropdown");
+        const q = filter.trim().toLowerCase();
+        const matches = q
+          ? Q_CROP_LIST.filter((c) => c.toLowerCase().includes(q))
+          : Q_CROP_LIST;
+        dd.innerHTML = matches.length
+          ? matches
+              .map(
+                (c) =>
+                  `<div class="crop-option" onclick="selectQCrop('${c.replace(/'/g, "\\'")}')">${c}</div>`,
+              )
+              .join("")
+          : '<div class="crop-option" style="color:var(--muted,#526B61);cursor:default;">No matches found</div>';
+      }
+
+      function showQCropList() {
+        renderQCropList(document.getElementById("q-crop-search").value);
+        document.getElementById("q-crop-dropdown").style.display = "block";
+      }
+
+      function filterQCropList() {
+        renderQCropList(document.getElementById("q-crop-search").value);
+        document.getElementById("q-crop-dropdown").style.display = "block";
+      }
+
+      function selectQCrop(c) {
+        document.getElementById("q-crop-search").value = c;
+        document.getElementById("q-crop").value = c;
+        document.getElementById("q-crop-dropdown").style.display = "none";
+      }
+
+      document.addEventListener("click", (e) => {
+        if (
+          !e.target.closest("#q-crop-search") &&
+          !e.target.closest("#q-crop-dropdown")
+        ) {
+          const dd = document.getElementById("q-crop-dropdown");
+          if (dd) dd.style.display = "none";
+        }
+      });
+
+      // Set the visible search box to show "Cotton" as the default on page load
+      window.addEventListener("DOMContentLoaded", () => {
+        const s = document.getElementById("q-crop-search");
+        if (s) s.value = "Cotton";
+      });
+
+      // ── LIST CROP ── real POST to MongoDB via the backend
+      async function listCrop() {
+        const crop = document.getElementById("q-crop").value;
+        const qty = document.getElementById("q-qty").value;
+        const price = document.getElementById("q-price").value;
+        const loc = document.getElementById("q-loc").value;
+        if (!qty || !price || !loc) {
+          showToast("⚠️ Fill all fields", "⚠️");
+          return;
+        }
+
+        const user = AuthGuard.getUser();
+
+        try {
+          showToast("💾 Saving listing...", "💾");
+          await NexoraAPI.createListing({
+            crop,
+            quantity: Number(qty),
+            pricePerUnit: Number(price),
+            district: loc,
+            region: loc,
+            unit: "quintal",
+          });
+
+          // Blockchain record stays as the simulated demo layer (unchanged from before)
+          showToast("⛓️ Recording on blockchain...", "⛓️");
+          const block = await NexoraChain.registerCrop(user, {
+            crop,
+            quantity: qty + " qtl",
+            price: "₹" + price + "/qtl",
+            location: loc,
+          });
+          showToast(
+            `✅ ${crop} listed & saved to database! Block #${block.blockId} on chain`,
+            "✅",
+          );
+
+          refreshCounts();
+          loadListingsTable();
+          document.getElementById("q-qty").value = "";
+          document.getElementById("q-price").value = "";
+          document.getElementById("q-loc").value = "";
+        } catch (err) {
+          showToast("❌ Could not save listing: " + err.message, "❌");
+        }
+      }
+
+      // ── LOAD BIDS PANEL ── real bids across all this farmer's listings
+      async function loadBidsPanel() {
+        const container = document.getElementById("bids-list-container");
+        let bids = [];
+        try {
+          bids = await NexoraAPI.getMyBidsAsFarmer();
+        } catch (err) {
+          container.innerHTML = `<p style="color:var(--red);padding:1rem;">Could not load bids: ${err.message}</p>`;
+          return;
+        }
+
+        const pending = bids.filter((b) => b.status === "pending");
+        document.getElementById("bids-active-badge").textContent =
+          `${pending.length} Active`;
+        const overviewBadge = document.getElementById("overview-bids-badge");
+        if (overviewBadge) overviewBadge.textContent = `${pending.length} New`;
+
+        const previewContainer = document.getElementById(
+          "overview-bids-preview",
+        );
+        if (previewContainer) {
+          previewContainer.innerHTML = pending.length
+            ? pending
+                .slice(0, 3)
+                .map(
+                  (b) => `
+        <div class="bid-item">
+          <div class="bid-avatar">🏭</div>
+          <div style="flex:1"><div style="font-size:0.88rem;font-weight:600;">${b.buyer?.name || "Buyer"}</div><div style="font-size:0.78rem;color:var(--muted)">${b.listing?.crop || ""} · ${b.quantity} qtl</div></div>
+          <div><div class="bid-price">₹${Number(b.offerPrice).toLocaleString("en-IN")}</div><div style="display:flex;gap:0.4rem;margin-top:0.3rem;"><button class="bid-accept" onclick="acceptBid('${b._id}')">Accept</button><button class="bid-decline" onclick="rejectBid('${b._id}')">Decline</button></div></div>
+        </div>`,
+                )
+                .join("")
+            : '<p style="color:var(--muted);padding:0.5rem 0;">No pending bids right now.</p>';
+        }
+
+        if (!bids.length) {
+          container.innerHTML =
+            '<p style="color:var(--muted);padding:1rem;">No bids yet. Once buyers bid on your listings, they\'ll appear here.</p>';
+          return;
+        }
+
+        container.innerHTML = bids
+          .map(
+            (b) => `
+    <div class="bid-item">
+      <div class="bid-avatar">🏭</div>
+      <div style="flex:1">
+        <div style="font-size:0.88rem;font-weight:600;">${b.buyer?.name || "Buyer"}${b.buyer?.companyName ? " · " + b.buyer.companyName : ""}</div>
+        <div style="font-size:0.78rem;color:var(--muted)">${b.listing?.crop || ""} · ${b.quantity} qtl${b.buyer?.district ? " · " + b.buyer.district : ""}</div>
+        ${b.message ? `<div style="font-size:0.76rem;color:var(--muted);margin-top:0.2rem;font-style:italic;">"${b.message}"</div>` : ""}
+      </div>
+      <div>
+        <div class="bid-price">₹${Number(b.offerPrice).toLocaleString("en-IN")}</div>
+        <div style="font-size:0.7rem;color:var(--muted);text-align:right;">${b.status}</div>
+        ${
+          b.status === "pending"
+            ? `
+          <div style="display:flex;gap:0.4rem;margin-top:0.3rem;">
+            <button class="bid-accept" onclick="acceptBid('${b._id}')">Accept</button>
+            <button class="bid-decline" onclick="rejectBid('${b._id}')">Decline</button>
+          </div>`
+            : ""
+        }
+      </div>
+    </div>`,
+          )
+          .join("");
+      }
+
+      // ── ACCEPT BID ── real backend call: creates an Order, marks listing sold
+      async function acceptBid(bidId) {
+        const user = AuthGuard.getUser();
+        try {
+          const result = await NexoraAPI.acceptBid(bidId);
+          showToast("⛓️ Recording transaction on chain...", "⛓️");
+          const block = await NexoraChain.recordTransaction(
+            { id: result.bid.buyer, name: "Buyer" },
+            { id: user.mobile, name: user.name },
+            {
+              crop: result.order.quantity + " units",
+              price: "₹" + result.order.finalPrice,
+              type: "DIRECT_PURCHASE",
+              platform: "SHIVAR",
+            },
+          );
+          showToast(
+            `✅ Bid accepted & order created! TX: ${block.txHash?.slice(0, 12)}... on chain`,
+            "✅",
+          );
+          loadBidsPanel();
+          loadListingsTable();
+          refreshCounts();
+        } catch (err) {
+          showToast("❌ Could not accept bid: " + err.message, "❌");
+        }
+      }
+
+      // ── REJECT BID ──
+      async function rejectBid(bidId) {
+        try {
+          await NexoraAPI.rejectBid(bidId);
+          showToast("Bid declined", "🚫");
+          loadBidsPanel();
+        } catch (err) {
+          showToast("❌ " + err.message, "❌");
+        }
+      }
+
+      // ════════════════════════════════
+      // MESSAGES — real conversations with buyers, built from real bids,
+      // backed by persisted chat history and live Socket.io updates across devices.
+      // ════════════════════════════════
+      let conversations = [];
+      const conversationKey = (listingId, buyerId) => `${listingId}_${buyerId}`;
+
+      async function loadConversationsFromBids() {
+        try {
+          const bids = await NexoraAPI.getMyBidsAsFarmer();
+          const seen = new Map();
+          bids.forEach((b) => {
+            if (!b.listing || !b.buyer) return;
+            const key = conversationKey(b.listing._id, b.buyer._id);
+            if (!seen.has(key)) {
+              seen.set(key, {
+                id: key,
+                listingId: b.listing._id,
+                otherId: b.buyer._id,
+                otherName: b.buyer.name,
+                crop: b.listing.crop,
+                avatar: "🏭",
+                preview: "Tap to open conversation",
+                time: "",
+                unread: false,
+                thread: [],
+                loaded: false,
+              });
+            }
+          });
+          conversations = Array.from(seen.values());
+        } catch (err) {
+          console.warn("Could not load conversations:", err.message);
+          conversations = [];
+        }
+      }
+
+      function renderMessages() {
+        const list = document.getElementById("messages-list");
+        const unread = conversations.filter((c) => c.unread).length;
+        const badge = document.getElementById("unread-badge");
+        if (badge) badge.textContent = unread ? unread + " Unread" : "All Read";
+
+        if (!conversations.length) {
+          list.innerHTML = `<p style="color:var(--muted);padding:1.5rem;text-align:center;">No conversations yet. Once a buyer bids on your crop, you can message them here.</p>`;
+          return;
+        }
+        list.innerHTML = conversations
+          .map(
+            (m) => `
+    <div class="msg-item ${m.unread ? "unread" : ""}" id="msg-item-${m.id}" onclick="toggleThread('${m.id}')">
+      <div class="msg-avatar-sm">${m.avatar}</div>
+      <div class="msg-content" style="flex:1">
+        <h5>${m.otherName} <span style="font-size:0.75rem;color:var(--muted);font-weight:400">· ${m.crop}</span>${m.unread ? '<span style="font-size:0.65rem;background:var(--lime);color:#14532D;border-radius:4px;padding:0.1rem 0.4rem;margin-left:0.5rem;font-weight:700">NEW</span>' : ""}</h5>
+        <p>${m.preview}</p>
+        <div class="msg-thread" id="thread-${m.id}">
+          <div style="margin-bottom:0.8rem" id="thread-body-${m.id}"></div>
+        <div class="msg-reply" onclick="event.stopPropagation()">
+            <input type="text" id="reply-${m.id}" placeholder="Type a message..." onkeydown="if(event.key==='Enter')sendReply('${m.id}')"/>
+            <button class="small-btn small-btn-green" onclick="event.stopPropagation(); sendReply('${m.id}')" style="background:var(--leaf);color:#fff;border:none;border-radius:8px;padding:0 1rem;cursor:pointer;">Send</button>
+          </div>
+        </div>
+      </div>
+      <div class="msg-time">${m.time}</div>
+    </div>`,
+          )
+          .join("");
+      }
+
+      function renderThreadBody(conv) {
+        const el = document.getElementById("thread-body-" + conv.id);
+        if (!el) return;
+        const me = AuthGuard.getUser();
+        el.innerHTML =
+          conv.thread
+            .map((msg) => {
+              const isMe = String(msg.sender) === String(me.id);
+              return `<div class="msg-bubble ${isMe ? "farmer" : "buyer"}" style="margin-bottom:0.5rem"><span style="font-size:0.7rem;color:var(--muted);display:block;margin-bottom:0.2rem">${isMe ? "You" : conv.otherName}</span>${msg.text}</div>`;
+            })
+            .join("") ||
+          '<p style="color:var(--muted);font-size:0.82rem;">No messages yet.</p>';
+      }
+
+      async function toggleThread(id) {
+        const thread = document.getElementById("thread-" + id);
+        const item = document.getElementById("msg-item-" + id);
+        const conv = conversations.find((c) => c.id === id);
+        const isOpen = thread.style.display === "block";
+        document
+          .querySelectorAll(".msg-thread")
+          .forEach((t) => (t.style.display = "none"));
+        thread.style.display = isOpen ? "none" : "block";
+
+        if (conv) {
+          conv.unread = false;
+          item.classList.remove("unread");
+          if (!isOpen) {
+            NexoraSocket.joinConversation(conv.listingId, conv.otherId);
+            if (!conv.loaded) {
+              try {
+                conv.thread = await NexoraAPI.getChatHistory(
+                  conv.listingId,
+                  conv.otherId,
+                );
+                conv.loaded = true;
+              } catch (err) {
+                console.warn("Could not load chat history:", err.message);
+              }
+            }
+            renderThreadBody(conv);
+          }
+        }
+      }
+
+      function sendReply(id) {
+        const conv = conversations.find((c) => c.id === id);
+        const input = document.getElementById("reply-" + id);
+        const text = input.value.trim();
+        if (!text || !conv) return;
+        NexoraSocket.sendMessage(conv.listingId, conv.otherId, text);
+        input.value = "";
+      }
+
+      function handleIncomingMessage(msg) {
+        let conv = conversations.find(
+          (c) =>
+            String(c.listingId) === String(msg.listing) &&
+            (String(c.otherId) === String(msg.sender) ||
+              String(c.otherId) === String(msg.receiver)),
+        );
+
+        if (!conv) {
+          const me = AuthGuard.getUser();
+          const otherId =
+            String(msg.sender) === String(me.id) ? msg.receiver : msg.sender;
+          conv = {
+            id: conversationKey(msg.listing, otherId),
+            listingId: msg.listing,
+            otherId,
+            otherName: msg.senderName || "Buyer",
+            crop: msg.listingCrop || "",
+            avatar: "🏭",
+            preview: "",
+            time: "",
+            unread: false,
+            thread: [],
+            loaded: true,
+          };
+          conversations.unshift(conv);
+        }
+
+        conv.thread.push(msg);
+        conv.preview = msg.text;
+        conv.time = "Just now";
+        const me = AuthGuard.getUser();
+        if (String(msg.sender) !== String(me.id)) {
+          const threadEl = document.getElementById("thread-" + conv.id);
+          conv.unread = !(threadEl && threadEl.style.display === "block");
+        }
+        renderMessages();
+        const threadEl = document.getElementById("thread-" + conv.id);
+        if (threadEl && threadEl.style.display === "block")
+          renderThreadBody(conv);
+      }
+
+      // ── LOAD LISTINGS TABLE ── real data from MongoDB, scoped to the logged-in farmer
+      async function loadListingsTable() {
+        const user = AuthGuard.getUser();
+        const tbody = document.getElementById("overview-tbody");
+        const fullTbody = document.getElementById("full-listings-tbody");
+
+        let listings = [];
+        try {
+          listings = await NexoraAPI.getMyListings(user.id);
+        } catch (err) {
+          showToast("❌ Could not load listings: " + err.message, "❌");
+        }
+
+        document.getElementById("listing-count").textContent = listings.length;
+
+        if (!listings.length) {
+          const empty =
+            '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:1.5rem;">No listings yet.</td></tr>';
+          tbody.innerHTML = empty;
+          fullTbody.innerHTML = empty;
+          return;
+        }
+
+        const statusPill = {
+          available: "status-active",
+          sold: "status-sold",
+          withdrawn: "status-inactive",
+        };
+        const rows = listings
+          .map(
+            (l) => `
+    <tr>
+      <td>${l.crop}</td>
+      <td>${l.quantity} ${l.unit || "qtl"}</td>
+      <td style="color:var(--gold);font-weight:600;">₹${Number(l.pricePerUnit).toLocaleString("en-IN")}</td>
+      <td>${l.district || l.region || ""}</td>
+      <td><span class="status-pill ${statusPill[l.status] || "status-active"}">${l.status}</span></td>
+      <td><span style="font-size:0.72rem;color:var(--lime);">⛓️ On Chain</span></td>
+    </tr>`,
+          )
+          .join("");
+
+        tbody.innerHTML = rows;
+        fullTbody.innerHTML = rows;
+      }
+
+      // ── BLOCKCHAIN REFRESH ──
+      function refreshBlockchain() {
+        const chain = NexoraChain.getChain();
+        const valid = NexoraChain.verifyChain();
+
+        document.getElementById("bc-total").textContent = chain.length;
+        document.getElementById("bc-crops").textContent =
+          NexoraChain.getByType("CROP_REGISTRATION").length;
+        document.getElementById("bc-txns").textContent =
+          NexoraChain.getByType("BUYER_TRANSACTION").length;
+        document.getElementById("bc-ai").textContent =
+          NexoraChain.getByType("AI_CONSULTATION").length;
+        document.getElementById("chain-valid-badge").textContent = valid
+          ? "✓ Chain Valid"
+          : "⚠️ Tampered!";
+        document.getElementById("chain-valid-badge").style.color = valid
+          ? "var(--lime)"
+          : "var(--red)";
+
+        BlockchainUI.renderHistory("bc-history", chain.slice(1)); // skip genesis
+        refreshCounts();
+      }
+
+      function filterBC(type) {
+        const chain =
+          type === "all"
+            ? NexoraChain.getChain().slice(1)
+            : NexoraChain.getByType(type);
+        BlockchainUI.renderHistory("bc-history", chain);
+        document.querySelectorAll(".bc-filter-btn").forEach((b) => {
+          b.style.background = "transparent";
+          b.style.color = "var(--muted)";
+        });
+        event.target.style.background = "rgba(21, 128, 61,0.2)";
+        event.target.style.color = "var(--lime)";
+      }
+
+      function clearChainDemo() {
+        if (confirm("Reset blockchain for demo? This removes all records.")) {
+          localStorage.removeItem("nexora_blockchain");
+          refreshBlockchain();
+          showToast("🔄 Chain reset for demo", "🔄");
+        }
+      }
+
+      function refreshCounts() {
+        const chain = NexoraChain.getChain();
+        document.getElementById("bc-count").textContent = chain.length - 1;
+      }
+
+      // ── PROFILE PANEL ──
+      function updateProfilePanel(user) {
+        const el = document.getElementById("profile-content");
+        const fields = [
+          ["Name", user.name || "Ramesh Patil"],
+          ["Mobile", user.mobile || "9876543210"],
+          ["Role", "Farmer (Verified)"],
+          ["District", user.district || "Nashik"],
+          ["State", user.state || "Maharashtra"],
+          ["Village", user.village || "Dindori"],
+          ["Primary Crop", user.crop || "Cotton"],
+          [
+            "Registered",
+            user.registeredAt
+              ? new Date(user.registeredAt).toLocaleDateString("en-IN")
+              : "Demo Account",
+          ],
+        ];
+        el.innerHTML = fields
+          .map(
+            ([k, v]) => `
+    <div style="display:flex;justify-content:space-between;padding:0.7rem 0;border-bottom:1px solid rgba(30, 58, 138,0.04);">
+      <span style="color:var(--muted);font-size:0.85rem;">${k}</span>
+      <span style="font-size:0.85rem;font-weight:500;">${v}</span>
+    </div>`,
+          )
+          .join("");
+      }
+
+      // ── AI KEY SAVE ──
+      function saveAIKey() {
+        const key = document.getElementById("ai-key-input").value.trim();
+        if (key) {
+          window.NEXORA_OPENAI_KEY = key;
+          localStorage.setItem("nexora_ai_key", key);
+          showToast("🔑 API key saved! AI now uses real GPT-4", "🔑");
+        } else {
+          showToast("ℹ️ No key — smart fallback mode active", "ℹ️");
+        }
+      }
+
+      // ── TOAST ──
+      function showToast(msg, icon = "✅") {
+        document.getElementById("toast-icon").textContent = icon;
+        document.getElementById("toast-msg").textContent = msg;
+        const t = document.getElementById("toast");
+        t.classList.add("show");
+        setTimeout(() => t.classList.remove("show"), 3500);
+      }
+    </script>
+
+    <!-- Purely decorative visual-effects script — no auth/business logic, no API calls -->
+    <script>
+      (function () {
+        // Preloader
+        window.addEventListener("load", () => {
+          const pl = document.getElementById("preloader");
+          if (pl) setTimeout(() => pl.classList.add("done"), 300);
+        });
+
+        // Custom cursor (dot + lagging ring)
+        const cDot = document.getElementById("cursor-dot");
+        const cRing = document.getElementById("cursor-ring");
+        if (cDot && cRing && window.matchMedia("(pointer:fine)").matches) {
+          let mx = 0, my = 0, rx = 0, ry = 0;
+          document.addEventListener("mousemove", (e) => {
+            mx = e.clientX; my = e.clientY;
+            cDot.style.left = mx + "px"; cDot.style.top = my + "px";
+          });
+          (function animateRing() {
+            rx += (mx - rx) * 0.15; ry += (my - ry) * 0.15;
+            cRing.style.left = rx + "px"; cRing.style.top = ry + "px";
+            requestAnimationFrame(animateRing);
+          })();
+          document.body.addEventListener("mouseover", (e) => {
+            const t = e.target.closest("a, button, .btn, .metric-card, .sidebar-nav li a");
+            if (t) cRing.classList.add("hover");
+          });
+          document.body.addEventListener("mouseout", (e) => {
+            const t = e.target.closest("a, button, .btn, .metric-card, .sidebar-nav li a");
+            if (t) cRing.classList.remove("hover");
+          });
+        }
+
+        // Click burst particles on primary action buttons
+        const BURST_EMOJI = ["🌿", "🍃", "✨", "🌾"];
+        document.body.addEventListener("click", (e) => {
+          const t = e.target.closest(".btn-green, .small-btn-green");
+          if (!t) return;
+          for (let i = 0; i < 7; i++) {
+            const p = document.createElement("span");
+            p.className = "burst-particle";
+            p.textContent = BURST_EMOJI[Math.floor(Math.random() * BURST_EMOJI.length)];
+            const angle = Math.random() * Math.PI * 2;
+            const dist = 35 + Math.random() * 45;
+            p.style.setProperty("--bx", Math.cos(angle) * dist + "px");
+            p.style.setProperty("--by", Math.sin(angle) * dist + "px");
+            p.style.setProperty("--br", Math.random() * 360 + "deg");
+            p.style.left = e.clientX + "px";
+            p.style.top = e.clientY + "px";
+            document.body.appendChild(p);
+            setTimeout(() => p.remove(), 900);
+          }
+        });
+      })();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,2590 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <script src="auth-guard.js"></script>
+    <script src="http://localhost:5000/socket.io/socket.io.js"></script>
+    <script src="api-client.js"></script>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Shivar — Buyer / Industry Dashboard</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      *,
+      *::before,
+      *::after {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      :root {
+        --earth-dark: #F0FDF4;
+        --earth-mid: #ffffff;
+        --earth-green: #DCFCE7;
+        --leaf: #15803D;
+        --lime: #22C55E;
+        --gold: #FF9933;
+        --blue: #2563EB;
+        --blue-dark: #1E3A8A;
+        --cream: #17352A;
+        --text-main: #17352A;
+        --text-muted: #526B61;
+        --sidebar: 260px;
+      }
+      body {
+        font-family: "DM Sans", sans-serif;
+        background: linear-gradient(180deg, #F0FDF4 0%, #F0F9FF 50%, #F0FDF4 100%);
+        color: var(--text-main);
+        display: flex;
+        min-height: 100vh;
+      }
+
+      /* ── CUSTOM CURSOR ── */
+      @media (pointer: fine) {
+        body { cursor: none; }
+        a, button, .btn, .metric-card, .sidebar-nav li a { cursor: none; }
+      }
+      #cursor-dot, #cursor-ring {
+        position: fixed; top: 0; left: 0; pointer-events: none; z-index: 9999;
+        border-radius: 50%; transform: translate(-50%,-50%);
+      }
+      #cursor-dot { width: 7px; height: 7px; background: var(--leaf); opacity: 0.9; }
+      #cursor-ring {
+        width: 34px; height: 34px; border: 1.5px solid rgba(21, 128, 61,0.55);
+        transition: width 0.25s, height 0.25s, border-color 0.25s, background 0.25s;
+      }
+      #cursor-ring.hover { width: 58px; height: 58px; border-color: rgba(37, 99, 235,0.7); background: rgba(21, 128, 61,0.08); }
+      @media (max-width: 900px), (pointer: coarse) {
+        #cursor-dot, #cursor-ring { display: none !important; }
+        body, a, button { cursor: auto; }
+      }
+
+      /* ── PRELOADER ── */
+      #preloader {
+        position: fixed; inset: 0; z-index: 10000;
+        background: linear-gradient(160deg, #F0FDF4 0%, #F0F9FF 100%);
+        display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 1rem;
+        transition: opacity 0.6s ease, visibility 0.6s ease;
+      }
+      #preloader .pl-mark {
+        font-family: "Playfair Display", serif; font-size: 2.2rem; font-weight: 900;
+        background: linear-gradient(120deg, #14532D, var(--leaf) 40%, var(--blue) 70%, #14532D);
+        background-size: 300% 100%; -webkit-background-clip: text; background-clip: text; color: transparent;
+        animation: gradientSweep 1.6s ease-in-out infinite;
+      }
+      #preloader .pl-bar { width: 150px; height: 3px; border-radius: 3px; background: rgba(21, 128, 61,0.15); overflow: hidden; }
+      #preloader .pl-bar::after {
+        content: ''; display: block; height: 100%; width: 40%;
+        background: linear-gradient(90deg, var(--leaf), var(--blue));
+        animation: plLoad 1s ease-in-out infinite;
+      }
+      @keyframes plLoad { 0% { transform: translateX(-100%); } 100% { transform: translateX(350%); } }
+      #preloader.done { opacity: 0; visibility: hidden; }
+
+      /* ── GRAIN ── */
+      #page-grain {
+        position: fixed; inset: -20%; z-index: 5; pointer-events: none; opacity: 0.02; mix-blend-mode: multiply;
+        background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+        animation: grainShift 1.2s steps(4) infinite;
+      }
+      @keyframes grainShift {
+        0% { transform: translate(0,0); } 25% { transform: translate(-1%,1%); }
+        50% { transform: translate(1%,-1%); } 75% { transform: translate(-1%,-1%); } 100% { transform: translate(0,0); }
+      }
+
+      /* ── SCROLLBAR ── */
+      ::-webkit-scrollbar { width: 10px; }
+      ::-webkit-scrollbar-track { background: #F0FDF4; }
+      ::-webkit-scrollbar-thumb { background: linear-gradient(180deg, var(--leaf), var(--blue)); border-radius: 10px; }
+      html { scrollbar-color: #15803D #F0FDF4; }
+
+      /* ── ROTATING GLOW BORDER ── */
+      .glow-border { position: relative; }
+      .glow-border::after {
+        content: ''; position: absolute; inset: -1.5px; border-radius: inherit; padding: 1.5px;
+        background: conic-gradient(from 0deg, var(--leaf), var(--blue), var(--gold), var(--leaf));
+        -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+        -webkit-mask-composite: xor; mask-composite: exclude;
+        opacity: 0; transition: opacity 0.3s; pointer-events: none;
+      }
+      .glow-border:hover::after { opacity: 1; }
+      @keyframes spinBorder { to { transform: rotate(360deg); } }
+
+      /* ── CLICK BURST ── */
+      .burst-particle {
+        position: fixed; z-index: 9997; pointer-events: none; font-size: 1rem;
+        animation: burstFly 0.9s ease-out forwards;
+      }
+      @keyframes burstFly { to { transform: translate(var(--bx), var(--by)) rotate(var(--br)); opacity: 0; } }
+
+      /* ── CARD LIFT ── */
+      .metric-card, .order-item, .farmer-card {
+        transition: transform 0.25s ease, box-shadow 0.25s ease;
+      }
+      .metric-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 16px 40px rgba(30, 58, 138,0.12);
+      }
+
+      /* SIDEBAR */
+      .sidebar {
+        width: var(--sidebar);
+        background: var(--earth-mid);
+        border-right: 1px solid rgba(37, 99, 235, 0.2);
+        display: flex;
+        flex-direction: column;
+        padding: 2rem 0;
+        position: fixed;
+        top: 0;
+        bottom: 0;
+        left: 0;
+      }
+      .sidebar-logo {
+        font-family: "Playfair Display", serif;
+        font-size: 1.5rem;
+        font-weight: 900;
+        background: linear-gradient(120deg, var(--leaf-deep,#14532D), var(--leaf) 40%, var(--blue) 70%, var(--leaf-deep,#14532D));
+        background-size: 300% 100%;
+        -webkit-background-clip: text; background-clip: text; color: transparent;
+        animation: gradientSweep 6s ease-in-out infinite;
+        padding: 0 1.8rem 2rem;
+        border-bottom: 1px solid rgba(37, 99, 235, 0.2);
+      }
+      .sidebar-logo span {
+        background: linear-gradient(120deg, var(--blue-dark), var(--blue) 60%, var(--leaf));
+        background-size: 300% 100%;
+        -webkit-background-clip: text; background-clip: text; color: transparent;
+        animation: gradientSweep 6s ease-in-out infinite;
+      }
+      @keyframes gradientSweep { 0%,100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
+      .sidebar-role-badge {
+        margin: 1rem 1.8rem 0;
+        background: rgba(37, 99, 235, 0.15);
+        border: 1px solid rgba(37, 99, 235, 0.3);
+        border-radius: 8px;
+        padding: 0.5rem 0.8rem;
+        font-size: 0.78rem;
+        color: #1E3A8A;
+        font-weight: 600;
+      }
+      .sidebar-label {
+        font-size: 0.68rem;
+        text-transform: uppercase;
+        letter-spacing: 1.5px;
+        color: var(--text-muted);
+        padding: 1.5rem 1.8rem 0.5rem;
+      }
+      .sidebar-nav {
+        list-style: none;
+        flex: 1;
+        padding: 0.5rem 0;
+      }
+      .sidebar-nav li a {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.75rem 1.8rem;
+        color: var(--text-muted);
+        text-decoration: none;
+        font-size: 0.9rem;
+        font-weight: 500;
+        transition: all 0.2s;
+        border-left: 3px solid transparent;
+      }
+      .sidebar-nav li a:hover,
+      .sidebar-nav li a.active {
+        color: var(--lime);
+        background: rgba(21, 128, 61, 0.08);
+        border-left-color: var(--lime);
+      }
+      .sidebar-user {
+        margin: 1rem;
+        background: rgba(220, 252, 231, 0.6);
+        border: 1px solid rgba(37, 99, 235, 0.2);
+        border-radius: 12px;
+        padding: 1rem;
+        display: flex;
+        align-items: center;
+        gap: 0.8rem;
+      }
+      .avatar {
+        width: 38px;
+        height: 38px;
+        background: linear-gradient(135deg, var(--blue-dark), var(--blue));
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1rem;
+        flex-shrink: 0;
+      }
+      .user-info .user-name {
+        font-size: 0.88rem;
+        font-weight: 600;
+      }
+      .user-info .user-role {
+        font-size: 0.75rem;
+        color: #1E3A8A;
+      }
+      .back-link {
+        display: block;
+        margin: 0 1.8rem 1rem;
+        color: var(--text-muted);
+        font-size: 0.82rem;
+        text-decoration: none;
+      }
+      .back-link:hover {
+        color: var(--lime);
+      }
+
+      /* MAIN */
+      .main {
+        margin-left: var(--sidebar);
+        flex: 1;
+        padding: 2.5rem;
+      }
+      .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 2rem;
+      }
+      .page-title {
+        font-family: "Playfair Display", serif;
+        font-size: 2rem;
+        font-weight: 900;
+      }
+      .page-sub {
+        font-size: 0.9rem;
+        color: var(--text-muted);
+        margin-top: 0.3rem;
+      }
+      .btn {
+        padding: 0.65rem 1.3rem;
+        border-radius: 8px;
+        font-size: 0.88rem;
+        font-weight: 600;
+        cursor: pointer;
+        border: none;
+        transition: all 0.2s;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+      }
+      .btn-green {
+        background: linear-gradient(135deg, var(--leaf), var(--lime));
+        color: #fff;
+      }
+      .btn-green:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 6px 20px rgba(21, 128, 61, 0.4);
+      }
+      .btn-blue {
+        background: linear-gradient(135deg, var(--blue-dark), var(--blue));
+        color: #fff;
+      }
+      .btn-blue:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 6px 20px rgba(37, 99, 235, 0.4);
+      }
+      .btn-outline {
+        background: transparent;
+        border: 1px solid rgba(21, 128, 61, 0.4);
+        color: var(--lime);
+      }
+      .btn-outline:hover {
+        background: rgba(21, 128, 61, 0.1);
+      }
+
+      /* METRICS */
+      .metrics {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 1.2rem;
+        margin-bottom: 2rem;
+      }
+      .metric-card {
+        background: var(--earth-mid);
+        border: 1px solid rgba(21, 128, 61, 0.2);
+        border-radius: 14px;
+        padding: 1.4rem;
+      }
+      .metric-label {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        margin-bottom: 0.5rem;
+      }
+      .metric-val {
+        font-family: "Playfair Display", serif;
+        font-size: 2rem;
+        font-weight: 900;
+      }
+      .metric-val.green {
+        color: var(--lime);
+      }
+      .metric-val.gold {
+        color: var(--gold);
+      }
+      .metric-val.blue {
+        color: #1E3A8A;
+      }
+      .metric-change {
+        font-size: 0.78rem;
+        margin-top: 0.4rem;
+        color: var(--lime);
+      }
+
+      /* LAYOUT */
+      .dashboard-grid {
+        display: grid;
+        grid-template-columns: 1fr 360px;
+        gap: 1.5rem;
+      }
+      .card {
+        background: var(--earth-mid);
+        border: 1px solid rgba(21, 128, 61, 0.2);
+        border-radius: 16px;
+        padding: 1.5rem;
+      }
+      .card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1.3rem;
+      }
+      .card-title {
+        font-size: 1rem;
+        font-weight: 700;
+      }
+      .badge {
+        font-size: 0.72rem;
+        font-weight: 600;
+        padding: 0.2rem 0.6rem;
+        border-radius: 4px;
+      }
+      .badge-green {
+        background: rgba(21, 128, 61, 0.2);
+        color: var(--lime);
+      }
+      .badge-gold {
+        background: rgba(255, 153, 51, 0.2);
+        color: var(--gold);
+      }
+      .badge-blue {
+        background: rgba(37, 99, 235, 0.2);
+        color: #1E3A8A;
+      }
+
+      /* SEARCH BAR */
+      .search-bar {
+        display: flex;
+        gap: 0.8rem;
+        margin-bottom: 1.5rem;
+        flex-wrap: wrap;
+      }
+      .search-input-wrap {
+        flex: 1;
+        position: relative;
+        min-width: 180px;
+      }
+      .search-input-wrap input {
+        width: 100%;
+        background: rgba(220, 252, 231, 0.8);
+        border: 1px solid rgba(21, 128, 61, 0.25);
+        border-radius: 8px;
+        padding: 0.7rem 0.9rem 0.7rem 2.4rem;
+        color: var(--text-main);
+        font-family: "DM Sans", sans-serif;
+        font-size: 0.9rem;
+      }
+      .search-input-wrap input:focus {
+        outline: none;
+        border-color: var(--lime);
+      }
+      .search-icon {
+        position: absolute;
+        left: 0.75rem;
+        top: 50%;
+        transform: translateY(-50%);
+        font-size: 0.9rem;
+      }
+      .filter-select {
+        background: rgba(220, 252, 231, 0.8);
+        border: 1px solid rgba(21, 128, 61, 0.25);
+        border-radius: 8px;
+        padding: 0.7rem 0.9rem;
+        color: var(--text-main);
+        font-family: "DM Sans", sans-serif;
+        font-size: 0.88rem;
+        cursor: pointer;
+      }
+      .filter-select option {
+        background: var(--earth-dark);
+      }
+
+      /* CROP LISTINGS (BUYER VIEW) */
+      .crop-grid {
+        display: flex;
+        flex-direction: column;
+        gap: 0.9rem;
+      }
+      .crop-listing {
+        background: rgba(220, 252, 231, 0.6);
+        border: 1px solid rgba(21, 128, 61, 0.2);
+        border-radius: 12px;
+        padding: 1.2rem 1.3rem;
+        display: grid;
+        grid-template-columns: auto 1fr auto auto;
+        align-items: center;
+        gap: 1rem;
+        transition:
+          border-color 0.2s,
+          transform 0.2s;
+      }
+      .crop-listing:hover {
+        border-color: rgba(21, 128, 61, 0.5);
+        transform: translateX(3px);
+      }
+      .crop-emoji {
+        font-size: 2rem;
+        width: 48px;
+        text-align: center;
+      }
+      .crop-info h4 {
+        font-size: 0.95rem;
+        font-weight: 700;
+        margin-bottom: 0.2rem;
+      }
+      .crop-tags {
+        display: flex;
+        gap: 0.4rem;
+        flex-wrap: wrap;
+      }
+      .crop-tag {
+        font-size: 0.72rem;
+        padding: 0.15rem 0.5rem;
+        border-radius: 4px;
+        background: rgba(21, 128, 61, 0.15);
+        color: var(--lime);
+      }
+      .crop-price-block {
+        text-align: right;
+      }
+      .crop-price {
+        font-family: "Playfair Display", serif;
+        font-size: 1.2rem;
+        font-weight: 700;
+        color: var(--gold);
+        white-space: nowrap;
+      }
+      .crop-unit {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+      }
+      .crop-actions {
+        display: flex;
+        flex-direction: column;
+        gap: 0.4rem;
+      }
+      .small-btn {
+        padding: 0.3rem 0.8rem;
+        border-radius: 6px;
+        font-size: 0.78rem;
+        font-weight: 600;
+        cursor: pointer;
+        border: none;
+        white-space: nowrap;
+      }
+      .small-btn-green {
+        background: var(--leaf);
+        color: #fff;
+      }
+      .small-btn-outline {
+        background: transparent;
+        border: 1px solid rgba(21, 128, 61, 0.3);
+        color: var(--lime);
+      }
+      .match-badge {
+        font-size: 0.7rem;
+        font-weight: 700;
+        padding: 0.15rem 0.5rem;
+        border-radius: 4px;
+        text-align: center;
+      }
+      .match-high {
+        background: rgba(21, 128, 61, 0.25);
+        color: var(--lime);
+      }
+      .match-med {
+        background: rgba(255, 153, 51, 0.2);
+        color: var(--gold);
+      }
+
+      /* BID MODAL */
+      .modal-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.7);
+        z-index: 200;
+        display: none;
+        align-items: center;
+        justify-content: center;
+      }
+      .modal-overlay.show {
+        display: flex;
+      }
+      .modal {
+        background: var(--earth-mid);
+        border: 1px solid rgba(21, 128, 61, 0.3);
+        border-radius: 20px;
+        padding: 2rem;
+        width: 420px;
+        max-width: 95vw;
+      }
+      .modal h3 {
+        font-family: "Playfair Display", serif;
+        font-size: 1.4rem;
+        margin-bottom: 1.2rem;
+      }
+      .modal-form {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+      }
+      .form-group label {
+        display: block;
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        margin-bottom: 0.4rem;
+      }
+      .form-group input,
+      .form-group select,
+      .form-group textarea {
+        width: 100%;
+        background: rgba(220, 252, 231, 0.8);
+        border: 1px solid rgba(21, 128, 61, 0.25);
+        border-radius: 8px;
+        padding: 0.7rem 0.9rem;
+        color: var(--text-main);
+        font-family: "DM Sans", sans-serif;
+        font-size: 0.9rem;
+      }
+      .form-group input:focus,
+      .form-group select:focus {
+        outline: none;
+        border-color: var(--lime);
+      }
+      .modal-actions {
+        display: flex;
+        gap: 0.8rem;
+        margin-top: 0.5rem;
+      }
+      .modal-close {
+        background: transparent;
+        border: 1px solid rgba(30, 58, 138, 0.1);
+        color: var(--text-muted);
+        padding: 0.65rem 1.2rem;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 0.88rem;
+      }
+
+      /* ORDER HISTORY */
+      .order-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.8rem;
+      }
+      .order-item {
+        background: rgba(220, 252, 231, 0.6);
+        border: 1px solid rgba(21, 128, 61, 0.15);
+        border-radius: 10px;
+        padding: 1rem 1.1rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .order-info h5 {
+        font-size: 0.88rem;
+        font-weight: 600;
+      }
+      .order-info p {
+        font-size: 0.78rem;
+        color: var(--text-muted);
+      }
+      .order-right {
+        text-align: right;
+      }
+      .order-amount {
+        font-size: 0.95rem;
+        font-weight: 700;
+        color: var(--gold);
+      }
+      .order-status {
+        font-size: 0.72rem;
+        padding: 0.15rem 0.5rem;
+        border-radius: 4px;
+      }
+      .os-delivered {
+        background: rgba(21, 128, 61, 0.2);
+        color: var(--lime);
+      }
+      .os-transit {
+        background: rgba(255, 153, 51, 0.2);
+        color: var(--gold);
+      }
+      .os-pending {
+        background: rgba(37, 99, 235, 0.2);
+        color: #1E3A8A;
+      }
+
+      /* DEMAND FORM */
+      .demand-form {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+      }
+      .form-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.8rem;
+      }
+
+      /* PANEL SYSTEM */
+      .panel {
+        display: none;
+        animation: fadeUp 0.3s ease both;
+      }
+      .panel.active {
+        display: block;
+      }
+      @keyframes fadeUp {
+        from {
+          opacity: 0;
+          transform: translateY(14px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      /* BIDS TABLE */
+      .bids-table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      .bids-table th {
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 0.8px;
+        color: var(--text-muted);
+        text-align: left;
+        padding: 0.5rem 0.8rem;
+        border-bottom: 1px solid rgba(30, 58, 138, 0.06);
+      }
+      .bids-table td {
+        padding: 0.85rem 0.8rem;
+        border-bottom: 1px solid rgba(30, 58, 138, 0.04);
+        font-size: 0.88rem;
+        vertical-align: middle;
+      }
+      .bids-table tr:last-child td {
+        border-bottom: none;
+      }
+      .bid-status {
+        font-size: 0.72rem;
+        font-weight: 600;
+        padding: 0.2rem 0.6rem;
+        border-radius: 20px;
+      }
+      .bs-pending {
+        background: rgba(37, 99, 235, 0.2);
+        color: #1E3A8A;
+      }
+      .bs-accepted {
+        background: rgba(21, 128, 61, 0.2);
+        color: var(--lime);
+      }
+      .bs-declined {
+        background: rgba(220, 38, 38, 0.2);
+        color: #DC2626;
+      }
+      .bs-counter {
+        background: rgba(255, 153, 51, 0.2);
+        color: var(--gold);
+      }
+
+      /* MESSAGES */
+      .msg-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.8rem;
+      }
+      .msg-item {
+        background: rgba(220, 252, 231, 0.6);
+        border: 1px solid rgba(21, 128, 61, 0.15);
+        border-radius: 10px;
+        padding: 1rem 1.1rem;
+        display: flex;
+        gap: 1rem;
+        align-items: flex-start;
+        cursor: pointer;
+        transition: border-color 0.2s;
+      }
+      .msg-item:hover {
+        border-color: rgba(21, 128, 61, 0.4);
+      }
+      .msg-item.unread {
+        border-left: 3px solid var(--lime);
+      }
+      .msg-avatar-sm {
+        width: 38px;
+        height: 38px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, var(--leaf), var(--lime));
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.1rem;
+        flex-shrink: 0;
+      }
+      .msg-content h5 {
+        font-size: 0.88rem;
+        font-weight: 600;
+        margin-bottom: 0.2rem;
+      }
+      .msg-content p {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+      }
+      .msg-time {
+        font-size: 0.72rem;
+        color: var(--text-muted);
+        margin-left: auto;
+        flex-shrink: 0;
+      }
+      .msg-bubble {
+        padding: 0.7rem 0.9rem;
+        border-radius: 10px;
+        font-size: 0.85rem;
+        margin-bottom: 0.6rem;
+        max-width: 80%;
+        line-height: 1.5;
+      }
+      .msg-bubble.farmer {
+        background: rgba(21, 128, 61, 0.15);
+        border: 1px solid rgba(21, 128, 61, 0.2);
+      }
+      .msg-bubble.buyer {
+        background: rgba(37, 99, 235, 0.15);
+        border: 1px solid rgba(37, 99, 235, 0.2);
+        margin-left: auto;
+      }
+      .msg-reply {
+        display: flex;
+        gap: 0.6rem;
+        margin-top: 0.8rem;
+      }
+      .msg-reply input {
+        flex: 1;
+        background: rgba(220, 252, 231, 0.8);
+        border: 1px solid rgba(21, 128, 61, 0.25);
+        border-radius: 8px;
+        padding: 0.6rem 0.9rem;
+        color: var(--text-main);
+        font-family: "DM Sans", sans-serif;
+        font-size: 0.85rem;
+      }
+      .msg-reply input:focus {
+        outline: none;
+        border-color: var(--lime);
+      }
+
+      /* VERIFIED FARMERS */
+      .farmer-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+        gap: 1.2rem;
+      }
+      .farmer-card {
+        background: rgba(220, 252, 231, 0.6);
+        border: 1px solid rgba(21, 128, 61, 0.2);
+        border-radius: 14px;
+        padding: 1.3rem;
+        transition:
+          transform 0.2s,
+          border-color 0.2s;
+      }
+      .farmer-card:hover {
+        transform: translateY(-3px);
+        border-color: rgba(21, 128, 61, 0.45);
+      }
+      .farmer-card-top {
+        display: flex;
+        align-items: center;
+        gap: 0.8rem;
+        margin-bottom: 1rem;
+      }
+      .farmer-av {
+        width: 44px;
+        height: 44px;
+        background: linear-gradient(135deg, var(--leaf), var(--lime));
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.3rem;
+        flex-shrink: 0;
+      }
+      .farmer-name {
+        font-size: 0.95rem;
+        font-weight: 700;
+      }
+      .farmer-meta {
+        font-size: 0.78rem;
+        color: var(--text-muted);
+      }
+      .farmer-stats {
+        display: flex;
+        gap: 1rem;
+        margin-bottom: 1rem;
+        padding: 0.8rem;
+        background: rgba(21, 128, 61, 0.06);
+        border-radius: 8px;
+      }
+      .fstat {
+        flex: 1;
+        text-align: center;
+      }
+      .fstat-val {
+        font-size: 1rem;
+        font-weight: 700;
+        color: var(--lime);
+      }
+      .fstat-label {
+        font-size: 0.68rem;
+        color: var(--text-muted);
+      }
+      .verified-tick {
+        font-size: 0.7rem;
+        background: rgba(21, 128, 61, 0.2);
+        color: var(--lime);
+        padding: 0.15rem 0.5rem;
+        border-radius: 4px;
+        font-weight: 700;
+      }
+
+      /* TOAST */
+      .toast {
+        position: fixed;
+        bottom: 2rem;
+        right: 2rem;
+        background: var(--earth-mid);
+        border: 1px solid rgba(21, 128, 61, 0.4);
+        border-radius: 12px;
+        padding: 1rem 1.3rem;
+        font-size: 0.88rem;
+        transform: translateY(100px);
+        opacity: 0;
+        transition: all 0.4s;
+        z-index: 300;
+        display: flex;
+        align-items: center;
+        gap: 0.7rem;
+      }
+      .toast.show {
+        transform: translateY(0);
+        opacity: 1;
+      }
+
+      @media (max-width: 900px) {
+        .sidebar {
+          display: none;
+        }
+        .main {
+          margin-left: 0;
+          padding: 1.5rem;
+        }
+        .metrics {
+          grid-template-columns: repeat(2, 1fr);
+        }
+        .dashboard-grid {
+          grid-template-columns: 1fr;
+        }
+        .crop-listing {
+          grid-template-columns: auto 1fr;
+        }
+        .crop-actions {
+          flex-direction: row;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="preloader"><div class="pl-mark">Shivar</div><div class="pl-bar"></div></div>
+    <div id="cursor-dot"></div>
+    <div id="cursor-ring"></div>
+    <div id="page-grain"></div>
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+      <div class="sidebar-logo">Shiv<span>ar</span></div>
+      <div class="sidebar-role-badge">🏭 Industry Buyer Portal</div>
+      <div class="sidebar-label">Procurement</div>
+      <ul class="sidebar-nav">
+        <li>
+          <a href="#" class="active" onclick="showPanel('dashboard', this)"
+            ><span>📊</span> Dashboard</a
+          >
+        </li>
+        <li>
+          <a href="#" onclick="showPanel('browse', this)"
+            ><span>🔍</span> Browse Crops</a
+          >
+        </li>
+        <li>
+          <a href="#" onclick="showPanel('bids', this)"
+            ><span>📋</span> My Bids</a
+          >
+        </li>
+        <li>
+          <a href="#" onclick="showPanel('orders', this)"
+            ><span>📦</span> Orders</a
+          >
+        </li>
+        <li>
+          <a href="smart-matching.html"><span>🤖</span> Smart Match</a>
+        </li>
+        <li>
+          <a href="smart-matching.html"><span>📈</span> Price Trends</a>
+        </li>
+        <li>
+          <a href="#" onclick="showPanel('messages', this)"
+            ><span>💬</span> Messages</a
+          >
+        </li>
+        <li>
+          <a href="#" onclick="showPanel('farmers', this)"
+            ><span>✅</span> Verified Farmers</a
+          >
+        </li>
+      </ul>
+      <a href="index.html" class="back-link">← Back to Home</a>
+      <div class="sidebar-user">
+        <div class="avatar">🏭</div>
+        <div class="user-info">
+          <div class="user-name">Mahindra Agro</div>
+          <div class="user-role">Verified Buyer · Pune</div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- MAIN -->
+    <main class="main">
+      <!-- ══ DASHBOARD PANEL ══ -->
+      <div id="panel-dashboard" class="panel active">
+        <div class="page-header">
+          <div>
+            <h1 class="page-title">Procurement Dashboard 🏭</h1>
+            <p class="page-sub">
+              Find crops, place bids & manage bulk orders — directly from
+              farmers.
+            </p>
+          </div>
+          <div style="display: flex; gap: 0.8rem">
+            <button class="btn btn-outline" onclick="showPanel('browse')">
+              🔍 Browse Crops
+            </button>
+            <a href="smart-matching.html" class="btn btn-green"
+              >🤖 Smart Match</a
+            >
+          </div>
+        </div>
+        <div class="metrics">
+          <div class="metric-card glow-border">
+            <div class="metric-label">Total Procured</div>
+            <div class="metric-val gold">₹82L</div>
+            <div class="metric-change">↓ 18% cost vs market avg</div>
+          </div>
+          <div class="metric-card glow-border">
+            <div class="metric-label">Active Bids</div>
+            <div class="metric-val blue" id="metric-bids">7</div>
+            <div class="metric-change">Awaiting farmer response</div>
+          </div>
+          <div class="metric-card glow-border">
+            <div class="metric-label">Orders in Transit</div>
+            <div class="metric-val green">3</div>
+            <div class="metric-change">↑ On-time delivery 96%</div>
+          </div>
+          <div class="metric-card glow-border">
+            <div class="metric-label">Savings vs Middlemen</div>
+            <div class="metric-val green">+₹9.2L</div>
+            <div class="metric-change">Direct purchase advantage</div>
+          </div>
+        </div>
+        <div class="dashboard-grid">
+          <div style="display: flex; flex-direction: column; gap: 1.5rem">
+            <div class="card">
+              <div class="card-header">
+                <span class="card-title">Recent Activity</span
+                ><span class="badge badge-green">Live</span>
+              </div>
+              <div class="order-list">
+                <div
+                  class="order-item"
+                  style="cursor: pointer"
+                  onclick="showPanel('browse')"
+                >
+                  <div class="order-info">
+                    <h5>🔍 Browse New Listings</h5>
+                    <p>42 crops available from verified farmers</p>
+                  </div>
+                  <div class="order-right">
+                    <span class="order-status os-pending">Open →</span>
+                  </div>
+                </div>
+                <div
+                  class="order-item"
+                  style="cursor: pointer"
+                  onclick="showPanel('bids')"
+                >
+                  <div class="order-info">
+                    <h5>📋 Cotton Bid — Ramesh Patil</h5>
+                    <p>₹14,800/qtl · Nashik · 2 hrs ago</p>
+                  </div>
+                  <div class="order-right">
+                    <div class="order-amount">₹14,800</div>
+                    <span class="order-status os-transit">Pending</span>
+                  </div>
+                </div>
+                <div
+                  class="order-item"
+                  style="cursor: pointer"
+                  onclick="showPanel('orders')"
+                >
+                  <div class="order-info">
+                    <h5>📦 Soybean · In Transit</h5>
+                    <p>Priya Desai · Latur · Apr 5</p>
+                  </div>
+                  <div class="order-right">
+                    <div class="order-amount">₹6.1L</div>
+                    <span class="order-status os-transit">In Transit</span>
+                  </div>
+                </div>
+                <div
+                  class="order-item"
+                  style="cursor: pointer"
+                  onclick="showPanel('messages')"
+                >
+                  <div class="order-info">
+                    <h5>💬 New Message — Gita More</h5>
+                    <p>Re: Turmeric quality certificate</p>
+                  </div>
+                  <div class="order-right">
+                    <span class="order-status os-pending">Unread</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 1.5rem">
+            <div class="card">
+              <div class="card-header">
+                <span class="card-title">Post a Demand</span>
+              </div>
+              <div class="demand-form">
+                <div class="form-group">
+                  <label>Crop Needed</label
+                  ><select id="demand-crop">
+                    <option>Cotton</option>
+                    <option>Wheat</option>
+                    <option>Sugarcane</option>
+                    <option>Soybean</option>
+                    <option>Turmeric</option>
+                  </select>
+                </div>
+                <div class="form-row">
+                  <div class="form-group">
+                    <label>Quantity (qtl)</label
+                    ><input
+                      type="number"
+                      id="demand-qty"
+                      placeholder="e.g. 500"
+                    />
+                  </div>
+                  <div class="form-group">
+                    <label>Max Price (₹/qtl)</label
+                    ><input
+                      type="number"
+                      id="demand-price"
+                      placeholder="e.g. 15000"
+                    />
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label>Preferred Region</label
+                  ><select>
+                    <option>Any Region</option>
+                    <option>Nashik</option>
+                    <option>Pune</option>
+                    <option>Nagpur</option>
+                    <option>Latur</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>Required By</label><input type="date" />
+                </div>
+                <button
+                  class="btn btn-blue"
+                  style="width: 100%"
+                  onclick="postDemand()"
+                >
+                  Post Demand →
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ BROWSE CROPS PANEL ══ -->
+      <div id="panel-browse" class="panel">
+        <div class="page-header">
+          <div>
+            <h1 class="page-title">🔍 Browse Crops</h1>
+            <p class="page-sub">
+              Live listings from verified farmers across Maharashtra.
+            </p>
+          </div>
+          <a href="smart-matching.html" class="btn btn-green">🤖 Smart Match</a>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Available Listings</span
+            ><span class="badge badge-green" id="listing-count-badge"
+              >6 Listings</span
+            >
+          </div>
+          <div class="search-bar">
+            <div class="search-input-wrap">
+              <span class="search-icon">🔍</span>
+              <input
+                type="text"
+                id="browse-search"
+                placeholder="Search crop, farmer, location..."
+                oninput="filterCrops(this.value)"
+              />
+            </div>
+            <select
+              class="filter-select"
+              id="crop-filter"
+              onchange="filterCrops()"
+            >
+              <option value="">All Crops</option>
+              <option>cotton</option>
+              <option>wheat</option>
+              <option>sugarcane</option>
+              <option>soybean</option>
+              <option>turmeric</option>
+              <option>pulses</option>
+            </select>
+            <select
+              class="filter-select"
+              id="region-filter"
+              onchange="filterCrops()"
+            >
+              <option value="">All Regions</option>
+              <option>nashik</option>
+              <option>aurangabad</option>
+              <option>kolhapur</option>
+              <option>latur</option>
+              <option>sangli</option>
+              <option>solapur</option>
+            </select>
+          </div>
+          <div class="crop-grid" id="crop-grid">
+            <div class="crop-listing" data-crop="cotton" data-region="nashik">
+              <div class="crop-emoji">🌿</div>
+              <div class="crop-info">
+                <h4>Premium Cotton — Long Staple</h4>
+                <div class="crop-tags">
+                  <span class="crop-tag">120 qtl</span
+                  ><span class="crop-tag">📍 Nashik, MH</span
+                  ><span class="crop-tag">Grade A</span
+                  ><span class="crop-tag">👨‍🌾 Ramesh Patil</span
+                  ><span class="crop-tag">⛓️ Verified</span>
+                </div>
+              </div>
+              <div class="crop-price-block">
+                <div class="crop-price">₹14,500</div>
+                <div class="crop-unit">per quintal</div>
+              </div>
+              <div class="crop-actions">
+                <span class="match-badge match-high">95% Match</span
+                ><button
+                  class="small-btn small-btn-green"
+                  onclick="
+                    openBid(
+                      'Premium Cotton — Long Staple',
+                      '₹14,500',
+                      'Ramesh Patil',
+                      'Nashik',
+                    )
+                  "
+                >
+                  Place Bid</button
+                ><button
+                  class="small-btn small-btn-outline"
+                  onclick="openMessage('Ramesh Patil', 'Cotton')"
+                >
+                  Contact
+                </button>
+              </div>
+            </div>
+            <div
+              class="crop-listing"
+              data-crop="wheat"
+              data-region="aurangabad"
+            >
+              <div class="crop-emoji">🌾</div>
+              <div class="crop-info">
+                <h4>Sharbati Wheat — Fresh Harvest</h4>
+                <div class="crop-tags">
+                  <span class="crop-tag">200 qtl</span
+                  ><span class="crop-tag">📍 Aurangabad, MH</span
+                  ><span class="crop-tag">Grade B+</span
+                  ><span class="crop-tag">👨‍🌾 Suresh Borate</span>
+                </div>
+              </div>
+              <div class="crop-price-block">
+                <div class="crop-price">₹2,600</div>
+                <div class="crop-unit">per quintal</div>
+              </div>
+              <div class="crop-actions">
+                <span class="match-badge match-med">78% Match</span
+                ><button
+                  class="small-btn small-btn-green"
+                  onclick="
+                    openBid(
+                      'Sharbati Wheat',
+                      '₹2,600',
+                      'Suresh Borate',
+                      'Aurangabad',
+                    )
+                  "
+                >
+                  Place Bid</button
+                ><button
+                  class="small-btn small-btn-outline"
+                  onclick="openMessage('Suresh Borate', 'Wheat')"
+                >
+                  Contact
+                </button>
+              </div>
+            </div>
+            <div
+              class="crop-listing"
+              data-crop="sugarcane"
+              data-region="kolhapur"
+            >
+              <div class="crop-emoji">🎋</div>
+              <div class="crop-info">
+                <h4>Sugarcane — High Sucrose Variety</h4>
+                <div class="crop-tags">
+                  <span class="crop-tag">500 qtl</span
+                  ><span class="crop-tag">📍 Kolhapur, MH</span
+                  ><span class="crop-tag">Co-86032</span
+                  ><span class="crop-tag">👨‍🌾 Anand Jadhav</span>
+                </div>
+              </div>
+              <div class="crop-price-block">
+                <div class="crop-price">₹3,200</div>
+                <div class="crop-unit">per quintal</div>
+              </div>
+              <div class="crop-actions">
+                <span class="match-badge match-high">91% Match</span
+                ><button
+                  class="small-btn small-btn-green"
+                  onclick="
+                    openBid(
+                      'Sugarcane — High Sucrose',
+                      '₹3,200',
+                      'Anand Jadhav',
+                      'Kolhapur',
+                    )
+                  "
+                >
+                  Place Bid</button
+                ><button
+                  class="small-btn small-btn-outline"
+                  onclick="openMessage('Anand Jadhav', 'Sugarcane')"
+                >
+                  Contact
+                </button>
+              </div>
+            </div>
+            <div class="crop-listing" data-crop="soybean" data-region="latur">
+              <div class="crop-emoji">🫘</div>
+              <div class="crop-info">
+                <h4>Soybean — JS 335 Variety</h4>
+                <div class="crop-tags">
+                  <span class="crop-tag">90 qtl</span
+                  ><span class="crop-tag">📍 Latur, MH</span
+                  ><span class="crop-tag">Organic Certified</span
+                  ><span class="crop-tag">👨‍🌾 Priya Desai</span>
+                </div>
+              </div>
+              <div class="crop-price-block">
+                <div class="crop-price">₹5,100</div>
+                <div class="crop-unit">per quintal</div>
+              </div>
+              <div class="crop-actions">
+                <span class="match-badge match-med">83% Match</span
+                ><button
+                  class="small-btn small-btn-green"
+                  onclick="
+                    openBid('Soybean JS 335', '₹5,100', 'Priya Desai', 'Latur')
+                  "
+                >
+                  Place Bid</button
+                ><button
+                  class="small-btn small-btn-outline"
+                  onclick="openMessage('Priya Desai', 'Soybean')"
+                >
+                  Contact
+                </button>
+              </div>
+            </div>
+            <div class="crop-listing" data-crop="turmeric" data-region="sangli">
+              <div class="crop-emoji">🟡</div>
+              <div class="crop-info">
+                <h4>Turmeric — Erode Variety (Dried)</h4>
+                <div class="crop-tags">
+                  <span class="crop-tag">60 qtl</span
+                  ><span class="crop-tag">📍 Sangli, MH</span
+                  ><span class="crop-tag">High Curcumin</span
+                  ><span class="crop-tag">👨‍🌾 Gita More</span>
+                </div>
+              </div>
+              <div class="crop-price-block">
+                <div class="crop-price">₹11,800</div>
+                <div class="crop-unit">per quintal</div>
+              </div>
+              <div class="crop-actions">
+                <span class="match-badge match-high">88% Match</span
+                ><button
+                  class="small-btn small-btn-green"
+                  onclick="
+                    openBid(
+                      'Turmeric Erode Variety',
+                      '₹11,800',
+                      'Gita More',
+                      'Sangli',
+                    )
+                  "
+                >
+                  Place Bid</button
+                ><button
+                  class="small-btn small-btn-outline"
+                  onclick="openMessage('Gita More', 'Turmeric')"
+                >
+                  Contact
+                </button>
+              </div>
+            </div>
+            <div class="crop-listing" data-crop="pulses" data-region="solapur">
+              <div class="crop-emoji">🌰</div>
+              <div class="crop-info">
+                <h4>Tur Dal Pulses — Grade A</h4>
+                <div class="crop-tags">
+                  <span class="crop-tag">70 qtl</span
+                  ><span class="crop-tag">📍 Solapur, MH</span
+                  ><span class="crop-tag">Govt Approved</span
+                  ><span class="crop-tag">👨‍🌾 Vijay Kale</span>
+                </div>
+              </div>
+              <div class="crop-price-block">
+                <div class="crop-price">₹7,000</div>
+                <div class="crop-unit">per quintal</div>
+              </div>
+              <div class="crop-actions">
+                <span class="match-badge match-med">74% Match</span
+                ><button
+                  class="small-btn small-btn-green"
+                  onclick="
+                    openBid('Tur Dal Pulses', '₹7,000', 'Vijay Kale', 'Solapur')
+                  "
+                >
+                  Place Bid</button
+                ><button
+                  class="small-btn small-btn-outline"
+                  onclick="openMessage('Vijay Kale', 'Pulses')"
+                >
+                  Contact
+                </button>
+              </div>
+            </div>
+          </div>
+          <div
+            id="no-results"
+            style="
+              display: none;
+              text-align: center;
+              padding: 2rem;
+              color: var(--text-muted);
+            "
+          >
+            No listings match your filter.
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ MY BIDS PANEL ══ -->
+      <div id="panel-bids" class="panel">
+        <div class="page-header">
+          <div>
+            <h1 class="page-title">📋 My Bids</h1>
+            <p class="page-sub">
+              Track all your active and past bids with farmers.
+            </p>
+          </div>
+          <button class="btn btn-outline" onclick="showPanel('browse')">
+            + Place New Bid
+          </button>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">All Bids</span>
+            <div style="display: flex; gap: 0.5rem">
+              <button
+                class="small-btn small-btn-outline bid-filter-btn active-filter"
+                onclick="filterBids('all', this)"
+              >
+                All
+              </button>
+              <button
+                class="small-btn small-btn-outline bid-filter-btn"
+                onclick="filterBids('Pending', this)"
+              >
+                Pending
+              </button>
+              <button
+                class="small-btn small-btn-outline bid-filter-btn"
+                onclick="filterBids('Accepted', this)"
+              >
+                Accepted
+              </button>
+              <button
+                class="small-btn small-btn-outline bid-filter-btn"
+                onclick="filterBids('Declined', this)"
+              >
+                Declined
+              </button>
+              <button
+                class="small-btn small-btn-outline bid-filter-btn"
+                onclick="filterBids('Counter Offer', this)"
+              >
+                Counter
+              </button>
+            </div>
+          </div>
+          <div style="overflow-x: auto">
+            <table class="bids-table">
+              <thead>
+                <tr>
+                  <th>Crop</th>
+                  <th>Farmer</th>
+                  <th>Location</th>
+                  <th>Listed</th>
+                  <th>My Bid</th>
+                  <th>Qty</th>
+                  <th>Date</th>
+                  <th>Status</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="bids-tbody"></tbody>
+            </table>
+          </div>
+          <div
+            id="bids-empty"
+            style="
+              display: none;
+              text-align: center;
+              padding: 2rem;
+              color: var(--text-muted);
+            "
+          >
+            No bids yet.
+            <a href="#" onclick="showPanel('browse')" style="color: var(--lime)"
+              >Browse crops →</a
+            >
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ ORDERS PANEL ══ -->
+      <div id="panel-orders" class="panel">
+        <div class="page-header">
+          <div>
+            <h1 class="page-title">📦 Orders & History</h1>
+            <p class="page-sub">
+              Track deliveries, confirmed orders and transaction history.
+            </p>
+          </div>
+          <div style="display: flex; gap: 0.5rem">
+            <button
+              class="small-btn small-btn-outline order-filter-btn active-filter"
+              onclick="filterOrders('all', this)"
+            >
+              All
+            </button>
+            <button
+              class="small-btn small-btn-outline order-filter-btn"
+              onclick="filterOrders('In Transit', this)"
+            >
+              In Transit
+            </button>
+            <button
+              class="small-btn small-btn-outline order-filter-btn"
+              onclick="filterOrders('Delivered', this)"
+            >
+              Delivered
+            </button>
+            <button
+              class="small-btn small-btn-outline order-filter-btn"
+              onclick="filterOrders('Confirmed', this)"
+            >
+              Confirmed
+            </button>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">All Orders</span
+            ><span class="badge badge-blue" id="orders-count">4 Orders</span>
+          </div>
+          <div class="order-list" id="orders-list"></div>
+        </div>
+      </div>
+
+      <!-- ══ MESSAGES PANEL ══ -->
+      <div id="panel-messages" class="panel">
+        <div class="page-header">
+          <div>
+            <h1 class="page-title">💬 Messages</h1>
+            <p class="page-sub">
+              Direct chat with farmers about quality, delivery & pricing.
+            </p>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Conversations</span
+            ><span class="badge badge-gold" id="unread-badge">2 Unread</span>
+          </div>
+          <div class="msg-list" id="messages-list"></div>
+        </div>
+      </div>
+
+      <!-- ══ VERIFIED FARMERS PANEL ══ -->
+      <div id="panel-farmers" class="panel">
+        <div class="page-header">
+          <div>
+            <h1 class="page-title">✅ Verified Farmers</h1>
+            <p class="page-sub">
+              Blockchain-verified, KYC-cleared farmers ready to trade directly.
+            </p>
+          </div>
+          <div class="search-input-wrap" style="max-width: 260px">
+            <span class="search-icon">🔍</span
+            ><input
+              type="text"
+              placeholder="Search farmers..."
+              oninput="filterFarmers(this.value)"
+            />
+          </div>
+        </div>
+        <div class="farmer-grid" id="farmers-grid"></div>
+      </div>
+    </main>
+    <!-- BID MODAL -->
+    <div class="modal-overlay" id="bid-modal">
+      <div class="modal">
+        <h3>Place a Bid 📋</h3>
+        <p
+          style="
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-bottom: 1rem;
+          "
+          id="modal-crop-name"
+        >
+          Cotton — Nashik
+        </p>
+        <div class="modal-form">
+          <div class="form-group">
+            <label>Your Bid Price (₹ per quintal)</label>
+            <input
+              type="number"
+              id="bid-price-input"
+              placeholder="e.g. 14800"
+            />
+            <small
+              style="
+                font-size: 0.75rem;
+                color: var(--text-muted);
+                margin-top: 0.3rem;
+                display: block;
+              "
+              >Listed at:
+              <span id="modal-list-price" style="color: var(--gold)"
+                >₹14,500</span
+              ></small
+            >
+          </div>
+          <div class="form-group">
+            <label>Quantity Required (qtl)</label>
+            <input type="number" placeholder="e.g. 100" />
+          </div>
+          <div class="form-group">
+            <label>Message to Farmer</label>
+            <textarea
+              rows="2"
+              placeholder="We are a verified textile unit based in Pune..."
+            ></textarea>
+          </div>
+          <div class="modal-actions">
+            <button class="btn btn-green" style="flex: 1" onclick="submitBid()">
+              Submit Bid →
+            </button>
+            <button class="modal-close" onclick="closeBid()">Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TOAST -->
+    <div class="toast" id="toast">
+      <span>✅</span>
+      <span id="toast-msg">Done!</span>
+    </div>
+
+    <script>
+      // ── AUTH GUARD ── real check: redirects to login if not a verified buyer
+      if (!AuthGuard.require("buyer")) {
+        throw new Error("Not authenticated");
+      }
+      window.addEventListener("DOMContentLoaded", () => {
+        AuthGuard.injectUserBadge(AuthGuard.getUser());
+      });
+
+      // ════════════════════════════════
+      // PANEL NAVIGATION
+      // ════════════════════════════════
+      function showPanel(id, clickedLink) {
+        document
+          .querySelectorAll(".panel")
+          .forEach((p) => p.classList.remove("active"));
+        document.getElementById("panel-" + id).classList.add("active");
+        document
+          .querySelectorAll(".sidebar-nav a")
+          .forEach((a) => a.classList.remove("active"));
+        if (clickedLink) clickedLink.classList.add("active");
+        else {
+          document.querySelectorAll(".sidebar-nav a").forEach((a) => {
+            if (
+              a.getAttribute("onclick") &&
+              a.getAttribute("onclick").includes("'" + id + "'")
+            )
+              a.classList.add("active");
+          });
+        }
+        window.scrollTo(0, 0);
+      }
+
+      // ════════════════════════════════
+      // BID MODAL
+      // ════════════════════════════════
+      let currentBidData = {};
+
+      function openBid(
+        cropName,
+        listedPrice,
+        farmerName,
+        location,
+        listingId = null,
+      ) {
+        currentBidData = {
+          cropName,
+          listedPrice,
+          farmerName,
+          location,
+          listingId,
+        };
+        document.getElementById("modal-crop-name").textContent =
+          cropName + " — " + (location || "");
+        document.getElementById("modal-list-price").textContent = listedPrice;
+        document.getElementById("bid-price-input").value = "";
+        document.getElementById("bid-modal").classList.add("show");
+      }
+      function closeBid() {
+        document.getElementById("bid-modal").classList.remove("show");
+      }
+
+      async function submitBid() {
+        const price = document.getElementById("bid-price-input").value;
+        if (!price) {
+          showToast("⚠️ Please enter a bid price");
+          return;
+        }
+        const qtyInputs = document.querySelectorAll(
+          "#bid-modal input[type=number]",
+        );
+        const quantity = Number((qtyInputs[1] && qtyInputs[1].value) || 100);
+
+        if (!currentBidData.listingId) {
+          // This card is showcase/demo content, not a real MongoDB listing — nothing to bid on for real
+          closeBid();
+          showToast(
+            "ℹ️ That's a sample listing. Try bidding on a live listing below — those save to the real database.",
+          );
+          return;
+        }
+
+        try {
+          await NexoraAPI.createBid({
+            listingId: currentBidData.listingId,
+            offerPrice: Number(price),
+            quantity,
+            message: "",
+          });
+          closeBid();
+          renderBids();
+          updateMetrics();
+          showToast(
+            "📋 Bid submitted to database! " +
+              currentBidData.farmerName +
+              " will respond soon.",
+          );
+        } catch (err) {
+          showToast("❌ Could not submit bid: " + err.message);
+        }
+      }
+
+      // ════════════════════════════════
+      // BIDS DATA & RENDERING
+      // ════════════════════════════════
+      const defaultBids = [
+        {
+          id: 1,
+          crop: "Premium Cotton — Long Staple",
+          farmer: "Ramesh Patil",
+          location: "Nashik",
+          listed: "₹14,500",
+          myBid: "₹14,800",
+          qty: "100 qtl",
+          date: "Apr 9, 2026",
+          status: "Pending",
+        },
+        {
+          id: 2,
+          crop: "Turmeric Erode Variety",
+          farmer: "Gita More",
+          location: "Sangli",
+          listed: "₹11,800",
+          myBid: "₹12,000",
+          qty: "50 qtl",
+          date: "Apr 7, 2026",
+          status: "Accepted",
+        },
+        {
+          id: 3,
+          crop: "Soybean JS 335",
+          farmer: "Priya Desai",
+          location: "Latur",
+          listed: "₹5,100",
+          myBid: "₹4,900",
+          qty: "80 qtl",
+          date: "Apr 5, 2026",
+          status: "Counter Offer",
+        },
+        {
+          id: 4,
+          crop: "Sharbati Wheat",
+          farmer: "Suresh Borate",
+          location: "Aurangabad",
+          listed: "₹2,600",
+          myBid: "₹2,550",
+          qty: "200 qtl",
+          date: "Mar 30, 2026",
+          status: "Declined",
+        },
+        {
+          id: 5,
+          crop: "Tur Dal Pulses",
+          farmer: "Vijay Kale",
+          location: "Solapur",
+          listed: "₹7,000",
+          myBid: "₹7,200",
+          qty: "60 qtl",
+          date: "Mar 25, 2026",
+          status: "Accepted",
+        },
+      ];
+
+      let liveBids = null; // cache of real backend bids once loaded, null = not loaded yet / offline
+
+      // Maps a real backend Bid document into the shape this UI already renders
+      function mapBackendBid(b) {
+        const statusMap = {
+          pending: "Pending",
+          accepted: "Accepted",
+          rejected: "Declined",
+        };
+        return {
+          id: b._id,
+          isReal: true,
+          crop: b.listing?.crop || "Crop",
+          farmer: b.farmer?.name || "Farmer",
+          location: b.farmer?.district || "",
+          listed:
+            "₹" + Number(b.listing?.pricePerUnit || 0).toLocaleString("en-IN"),
+          myBid: "₹" + Number(b.offerPrice).toLocaleString("en-IN"),
+          qty: b.quantity + " qtl",
+          date: new Date(b.createdAt).toLocaleDateString("en-IN"),
+          status: statusMap[b.status] || "Pending",
+          listingId: b.listing?._id,
+          farmerId: b.farmer?._id,
+        };
+      }
+
+      async function getBids() {
+        try {
+          const raw = await NexoraAPI.getMyBidsAsBuyer();
+          liveBids = raw.map(mapBackendBid);
+          return liveBids;
+        } catch (err) {
+          console.warn(
+            "Could not reach backend for bids, showing offline sample data:",
+            err.message,
+          );
+          return defaultBids;
+        }
+      }
+
+      async function renderBids(filterStatus) {
+        const bids = await getBids();
+        const tbody = document.getElementById("bids-tbody");
+        const empty = document.getElementById("bids-empty");
+        const filtered =
+          filterStatus && filterStatus !== "all"
+            ? bids.filter((b) => b.status === filterStatus)
+            : bids;
+
+        if (!filtered.length) {
+          tbody.innerHTML = "";
+          empty.style.display = "block";
+          return;
+        }
+        empty.style.display = "none";
+
+        const statusClass = {
+          Pending: "bs-pending",
+          Accepted: "bs-accepted",
+          Declined: "bs-declined",
+          "Counter Offer": "bs-counter",
+        };
+        const statusIcon = {
+          Pending: "⏳",
+          Accepted: "✅",
+          Declined: "❌",
+          "Counter Offer": "🔄",
+        };
+
+        tbody.innerHTML = filtered
+          .map(
+            (b) => `
+    <tr>
+      <td style="font-weight:600">${b.crop}</td>
+      <td>👨‍🌾 ${b.farmer}</td>
+      <td style="color:var(--text-muted)">📍 ${b.location}</td>
+      <td style="color:var(--text-muted)">${b.listed}</td>
+      <td style="color:var(--gold);font-weight:700">${b.myBid}</td>
+      <td>${b.qty}</td>
+      <td style="color:var(--text-muted);font-size:0.82rem">${b.date}</td>
+      <td><span class="bid-status ${statusClass[b.status] || "bs-pending"}">${statusIcon[b.status] || "⏳"} ${b.status}</span></td>
+      <td>
+        ${b.status === "Pending" ? `<button class="small-btn small-btn-outline" style="font-size:0.72rem" onclick="cancelBid('${b.id}')">Cancel</button>` : ""}
+        ${b.status === "Counter Offer" ? `<button class="small-btn small-btn-green" style="font-size:0.72rem" onclick="acceptCounter('${b.id}')">Accept</button>` : ""}
+        ${b.status === "Accepted" ? `<span style="font-size:0.72rem;color:var(--lime)">✅ Order created</span>` : ""}
+      </td>
+    </tr>`,
+          )
+          .join("");
+      }
+
+      function filterBids(status, btn) {
+        document.querySelectorAll(".bid-filter-btn").forEach((b) => {
+          b.style.borderColor = "";
+          b.style.color = "";
+        });
+        if (btn) {
+          btn.style.borderColor = "var(--lime)";
+          btn.style.color = "var(--lime)";
+        }
+        renderBids(status);
+      }
+
+      async function cancelBid(id) {
+        // Real bid (Mongo ObjectId strings are 24 hex chars) vs offline demo bid (plain number)
+        if (/^[a-f0-9]{24}$/i.test(id)) {
+          try {
+            await NexoraAPI.cancelBid(id);
+            renderBids();
+            updateMetrics();
+            showToast("🚫 Bid cancelled.");
+          } catch (err) {
+            showToast("❌ " + err.message);
+          }
+          return;
+        }
+        showToast("ℹ️ That's sample data — nothing to cancel on the server.");
+      }
+
+      function acceptCounter(id) {
+        // Counter-offers only exist in the offline demo dataset for now — no backend concept yet
+        showToast(
+          "ℹ️ Counter-offer negotiation isn't wired to the backend yet — this is sample behavior.",
+        );
+      }
+
+      // ════════════════════════════════
+      // ORDERS DATA & RENDERING
+      // ════════════════════════════════
+      const defaultOrders = [
+        {
+          id: 1,
+          crop: "Cotton · 80 qtl",
+          farmer: "Ramesh Patil",
+          location: "Nashik",
+          amount: "₹11.6L",
+          date: "Apr 5, 2026",
+          status: "In Transit",
+        },
+        {
+          id: 2,
+          crop: "Soybean · 120 qtl",
+          farmer: "Priya Desai",
+          location: "Latur",
+          amount: "₹6.1L",
+          date: "Mar 28, 2026",
+          status: "Delivered",
+        },
+        {
+          id: 3,
+          crop: "Wheat · 300 qtl",
+          farmer: "Suresh Borate",
+          location: "Aurangabad",
+          amount: "₹7.8L",
+          date: "Mar 20, 2026",
+          status: "Delivered",
+        },
+        {
+          id: 4,
+          crop: "Sugarcane · 400 qtl",
+          farmer: "Anand Jadhav",
+          location: "Kolhapur",
+          amount: "₹12.8L",
+          date: "Apr 8, 2026",
+          status: "Confirmed",
+        },
+      ];
+
+      // Backend order.status is one of confirmed/shipped/completed/cancelled — map to this UI's labels
+      function mapBackendOrder(o) {
+        const statusMap = {
+          confirmed: "Confirmed",
+          shipped: "In Transit",
+          completed: "Delivered",
+          cancelled: "Cancelled",
+        };
+        return {
+          id: o._id,
+          isReal: true,
+          crop: `${o.listing?.crop || "Crop"} · ${o.quantity} qtl`,
+          farmer: o.farmer?.name || "Farmer",
+          location: o.farmer?.district || "",
+          amount:
+            "₹" + Number(o.finalPrice * o.quantity).toLocaleString("en-IN"),
+          date: new Date(o.createdAt).toLocaleDateString("en-IN"),
+          status: statusMap[o.status] || "Confirmed",
+        };
+      }
+
+      async function getOrders() {
+        try {
+          const raw = await NexoraAPI.getMyOrders();
+          return raw.map(mapBackendOrder);
+        } catch (err) {
+          console.warn(
+            "Could not reach backend for orders, showing offline sample data:",
+            err.message,
+          );
+          return defaultOrders;
+        }
+      }
+
+      async function renderOrders(filterStatus) {
+        const orders = await getOrders();
+        const list = document.getElementById("orders-list");
+        const filtered =
+          filterStatus && filterStatus !== "all"
+            ? orders.filter((o) => o.status === filterStatus)
+            : orders;
+        document.getElementById("orders-count").textContent =
+          filtered.length + " Orders";
+        const statusClass = {
+          "In Transit": "os-transit",
+          Delivered: "os-delivered",
+          Confirmed: "os-pending",
+          Cancelled: "os-declined",
+        };
+        const statusIcon = {
+          "In Transit": "🚛",
+          Delivered: "✅",
+          Confirmed: "📋",
+          Cancelled: "❌",
+        };
+        list.innerHTML = filtered
+          .map(
+            (o) => `
+    <div class="order-item">
+      <div class="order-info">
+        <h5>${o.crop}</h5>
+        <p>👨‍🌾 ${o.farmer} · 📍 ${o.location || ""} · ${o.date}</p>
+      </div>
+      <div class="order-right">
+        <div class="order-amount">${o.amount}</div>
+        <span class="order-status ${statusClass[o.status] || "os-pending"}">${statusIcon[o.status] || "📋"} ${o.status}</span>
+      </div>
+    </div>`,
+          )
+          .join("");
+      }
+
+      function filterOrders(status, btn) {
+        document.querySelectorAll(".order-filter-btn").forEach((b) => {
+          b.style.borderColor = "";
+          b.style.color = "";
+        });
+        if (btn) {
+          btn.style.borderColor = "var(--lime)";
+          btn.style.color = "var(--lime)";
+        }
+        renderOrders(status);
+      }
+
+      // ════════════════════════════════
+      // MESSAGES — real conversations, built from real bids (real farmer + listing IDs),
+      // backed by persisted chat history and live Socket.io updates across devices.
+      // ════════════════════════════════
+      let conversations = [];
+      const conversationKey = (listingId, farmerId) =>
+        `${listingId}_${farmerId}`;
+
+      // Build the conversation list from the buyer's real bids — each unique (listing, farmer)
+      // pair becomes a conversation you can message the farmer in.
+      async function loadConversationsFromBids() {
+        try {
+          const bids = await NexoraAPI.getMyBidsAsBuyer();
+          const seen = new Map();
+          bids.forEach((b) => {
+            if (!b.listing || !b.farmer) return;
+            const key = conversationKey(b.listing._id, b.farmer._id);
+            if (!seen.has(key)) {
+              seen.set(key, {
+                id: key,
+                listingId: b.listing._id,
+                farmerId: b.farmer._id,
+                farmer: b.farmer.name,
+                crop: b.listing.crop,
+                avatar: "🌱",
+                preview: "Tap to open conversation",
+                time: "",
+                unread: false,
+                thread: [],
+                loaded: false,
+              });
+            }
+          });
+          conversations = Array.from(seen.values());
+        } catch (err) {
+          console.warn("Could not load conversations:", err.message);
+          conversations = [];
+        }
+      }
+
+      function renderMessages() {
+        const list = document.getElementById("messages-list");
+        const unread = conversations.filter((c) => c.unread).length;
+        const badge = document.getElementById("unread-badge");
+        if (badge) badge.textContent = unread ? unread + " Unread" : "All Read";
+
+        if (!conversations.length) {
+          list.innerHTML = `<p style="color:var(--text-muted);padding:1.5rem;text-align:center;">No conversations yet. Place a bid on a live listing, then message that farmer here.</p>`;
+          return;
+        }
+        list.innerHTML = conversations
+          .map(
+            (m) => `
+    <div class="msg-item ${m.unread ? "unread" : ""}" id="msg-item-${m.id}" onclick="toggleThread('${m.id}')">
+      <div class="msg-avatar-sm">${m.avatar}</div>
+      <div class="msg-content" style="flex:1">
+        <h5>${m.farmer} <span style="font-size:0.75rem;color:var(--text-muted);font-weight:400">· ${m.crop}</span>${m.unread ? '<span style="font-size:0.65rem;background:var(--lime);color:#14532D;border-radius:4px;padding:0.1rem 0.4rem;margin-left:0.5rem;font-weight:700">NEW</span>' : ""}</h5>
+        <p>${m.preview}</p>
+        <div class="msg-thread" id="thread-${m.id}">
+          <div style="margin-bottom:0.8rem" id="thread-body-${m.id}"></div>
+          <div class="msg-reply" onclick="event.stopPropagation()">
+  <input type="text" id="reply-${m.id}" placeholder="Type a message..." onkeydown="if(event.key==='Enter')sendReply('${m.id}')"/>
+  <button class="small-btn small-btn-green" onclick="event.stopPropagation(); sendReply('${m.id}')">Send</button>
+</div>
+        </div>
+      </div>
+      <div class="msg-time">${m.time}</div>
+    </div>`,
+          )
+          .join("");
+      }
+
+      function renderThreadBody(conv) {
+        const el = document.getElementById("thread-body-" + conv.id);
+        if (!el) return;
+        const me = AuthGuard.getUser();
+        el.innerHTML =
+          conv.thread
+            .map((msg) => {
+              const isMe = String(msg.sender) === String(me.id);
+              return `<div class="msg-bubble ${isMe ? "buyer" : "farmer"}" style="margin-bottom:0.5rem"><span style="font-size:0.7rem;color:var(--text-muted);display:block;margin-bottom:0.2rem">${isMe ? "You" : conv.farmer}</span>${msg.text}</div>`;
+            })
+            .join("") ||
+          '<p style="color:var(--text-muted);font-size:0.82rem;">No messages yet — say hello 👋</p>';
+      }
+
+      async function toggleThread(id) {
+        const thread = document.getElementById("thread-" + id);
+        const item = document.getElementById("msg-item-" + id);
+        const conv = conversations.find((c) => c.id === id);
+        const isOpen = thread.style.display === "block";
+        document
+          .querySelectorAll(".msg-thread")
+          .forEach((t) => (t.style.display = "none"));
+        thread.style.display = isOpen ? "none" : "block";
+
+        if (conv) {
+          conv.unread = false;
+          item.classList.remove("unread");
+
+          if (!isOpen) {
+            // Join the real-time room and load persisted history the first time this thread opens
+            NexoraSocket.joinConversation(conv.listingId, conv.farmerId);
+            if (!conv.loaded) {
+              try {
+                conv.thread = await NexoraAPI.getChatHistory(
+                  conv.listingId,
+                  conv.farmerId,
+                );
+                conv.loaded = true;
+              } catch (err) {
+                console.warn("Could not load chat history:", err.message);
+              }
+            }
+            renderThreadBody(conv);
+          }
+        }
+      }
+
+      function sendReply(id) {
+        const conv = conversations.find((c) => c.id === id);
+        const input = document.getElementById("reply-" + id);
+        const text = input.value.trim();
+        if (!text || !conv) return;
+        NexoraSocket.sendMessage(conv.listingId, conv.farmerId, text);
+        input.value = "";
+        // The message will appear via the real-time 'new_message' event below,
+        // so both this device AND the farmer's device render it the same way.
+      }
+
+      // ── Real-time: any message that arrives (sent by me or the farmer, from any device) ──
+
+      function handleIncomingMessage(msg) {
+        let conv = conversations.find(
+          (c) =>
+            String(c.listingId) === String(msg.listing) &&
+            (String(c.farmerId) === String(msg.sender) ||
+              String(c.farmerId) === String(msg.receiver)),
+        );
+
+        if (!conv) {
+          const me = AuthGuard.getUser();
+          const farmerId =
+            String(msg.sender) === String(me.id) ? msg.receiver : msg.sender;
+          conv = {
+            id: conversationKey(msg.listing, farmerId),
+            listingId: msg.listing,
+            farmerId,
+            farmer: msg.senderName || "Farmer",
+            crop: msg.listingCrop || "",
+            avatar: "🌱",
+            preview: "",
+            time: "",
+            unread: false,
+            thread: [],
+            loaded: true,
+          };
+          conversations.unshift(conv);
+        }
+
+        conv.thread.push(msg);
+        conv.preview = msg.text;
+        conv.time = "Just now";
+        const me = AuthGuard.getUser();
+        if (String(msg.sender) !== String(me.id)) {
+          const threadEl = document.getElementById("thread-" + conv.id);
+          conv.unread = !(threadEl && threadEl.style.display === "block");
+        }
+        renderMessages();
+        const threadEl = document.getElementById("thread-" + conv.id);
+        if (threadEl && threadEl.style.display === "block")
+          renderThreadBody(conv);
+      }
+
+      function openMessage(
+        farmerName,
+        crop,
+        listingId = null,
+        farmerId = null,
+      ) {
+        showPanel("messages");
+        if (!listingId || !farmerId) {
+          showToast(
+            "ℹ️ That's sample data — message a farmer from a live listing below to chat for real.",
+          );
+          return;
+        }
+        setTimeout(async () => {
+          const key = conversationKey(listingId, farmerId);
+          if (!conversations.find((c) => c.id === key)) {
+            conversations.unshift({
+              id: key,
+              listingId,
+              farmerId,
+              farmer: farmerName,
+              crop,
+              avatar: "🌱",
+              preview: "New conversation",
+              time: "Just now",
+              unread: false,
+              thread: [],
+              loaded: false,
+            });
+            renderMessages();
+          }
+          toggleThread(key);
+        }, 200);
+      }
+
+      // ════════════════════════════════
+      // VERIFIED FARMERS
+      // ════════════════════════════════
+      const farmersData = [
+        {
+          name: "Ramesh Patil",
+          district: "Nashik",
+          crop: "Cotton",
+          avatar: "🌿",
+          deals: 12,
+          rating: "4.9",
+          volume: "1,440 qtl",
+          verified: "2024",
+          tags: ["Grade A", "Long Staple", "Blockchain"],
+        },
+        {
+          name: "Gita More",
+          district: "Sangli",
+          crop: "Turmeric",
+          avatar: "🟡",
+          deals: 8,
+          rating: "4.8",
+          volume: "480 qtl",
+          verified: "2024",
+          tags: ["High Curcumin", "Organic", "Export"],
+        },
+        {
+          name: "Priya Desai",
+          district: "Latur",
+          crop: "Soybean",
+          avatar: "🫘",
+          deals: 15,
+          rating: "4.7",
+          volume: "1,350 qtl",
+          verified: "2023",
+          tags: ["Non-GMO", "Organic Cert", "Lab Tested"],
+        },
+        {
+          name: "Anand Jadhav",
+          district: "Kolhapur",
+          crop: "Sugarcane",
+          avatar: "🎋",
+          deals: 20,
+          rating: "5.0",
+          volume: "10,000 qtl",
+          verified: "2023",
+          tags: ["Co-86032", "High Sucrose", "Direct"],
+        },
+        {
+          name: "Suresh Borate",
+          district: "Aurangabad",
+          crop: "Wheat",
+          avatar: "🌾",
+          deals: 9,
+          rating: "4.6",
+          volume: "2,700 qtl",
+          verified: "2024",
+          tags: ["Grade B+", "Milling", "Bulk Ready"],
+        },
+        {
+          name: "Vijay Kale",
+          district: "Solapur",
+          crop: "Pulses",
+          avatar: "🌰",
+          deals: 6,
+          rating: "4.5",
+          volume: "420 qtl",
+          verified: "2025",
+          tags: ["Govt Approved", "Grade A", "NAFED"],
+        },
+      ];
+
+      function renderFarmers(list) {
+        const grid = document.getElementById("farmers-grid");
+        grid.innerHTML = (list || farmersData)
+          .map(
+            (f) => `
+    <div class="farmer-card">
+      <div class="farmer-card-top">
+        <div class="farmer-av">${f.avatar}</div>
+        <div>
+          <div class="farmer-name">${f.name} <span class="verified-tick">✓ KYC</span></div>
+          <div class="farmer-meta">📍 ${f.district} · ${f.crop}</div>
+        </div>
+      </div>
+      <div class="farmer-stats">
+        <div class="fstat"><div class="fstat-val">${f.deals}</div><div class="fstat-label">Deals</div></div>
+        <div class="fstat"><div class="fstat-val">⭐${f.rating}</div><div class="fstat-label">Rating</div></div>
+        <div class="fstat"><div class="fstat-val" style="font-size:0.82rem">${f.volume}</div><div class="fstat-label">Volume</div></div>
+      </div>
+      <div style="display:flex;gap:0.4rem;flex-wrap:wrap;margin-bottom:1rem">
+        ${f.tags.map((t) => `<span class="crop-tag">${t}</span>`).join("")}
+      </div>
+      <div style="display:flex;gap:0.5rem">
+        <button class="small-btn small-btn-green" style="flex:1" onclick="openBid('${f.crop}','Market Price','${f.name}','${f.district}')">Place Bid</button>
+        <button class="small-btn small-btn-outline" style="flex:1" onclick="openMessage('${f.name}','${f.crop}')">Message</button>
+      </div>
+    </div>`,
+          )
+          .join("");
+      }
+
+      function filterFarmers(val) {
+        const v = val.toLowerCase();
+        const filtered = v
+          ? farmersData.filter(
+              (f) =>
+                f.name.toLowerCase().includes(v) ||
+                f.crop.toLowerCase().includes(v) ||
+                f.district.toLowerCase().includes(v),
+            )
+          : farmersData;
+        renderFarmers(filtered);
+      }
+
+      // ════════════════════════════════
+      // BROWSE CROPS FILTER
+      // ════════════════════════════════
+      function filterCrops(searchVal) {
+        const search = (
+          searchVal ||
+          document.getElementById("browse-search")?.value ||
+          ""
+        ).toLowerCase();
+        const crop = (
+          document.getElementById("crop-filter")?.value || ""
+        ).toLowerCase();
+        const region = (
+          document.getElementById("region-filter")?.value || ""
+        ).toLowerCase();
+        let visible = 0;
+        document.querySelectorAll(".crop-listing").forEach((el) => {
+          const matchSearch =
+            !search || el.innerHTML.toLowerCase().includes(search);
+          const matchCrop = !crop || el.dataset.crop === crop;
+          const matchRegion = !region || el.dataset.region === region;
+          const show = matchSearch && matchCrop && matchRegion;
+          el.style.display = show ? "" : "none";
+          if (show) visible++;
+        });
+        const nr = document.getElementById("no-results");
+        if (nr) nr.style.display = visible ? "none" : "block";
+        const badge = document.getElementById("listing-count-badge");
+        if (badge) badge.textContent = visible + " Listings";
+      }
+
+      // ════════════════════════════════
+      // METRICS
+      // ════════════════════════════════
+      async function updateMetrics() {
+        const bids = await getBids();
+        const pending = bids.filter((b) => b.status === "Pending").length;
+        const el = document.getElementById("metric-bids");
+        if (el) el.textContent = pending;
+      }
+
+      // ════════════════════════════════
+      // POST DEMAND
+      // ════════════════════════════════
+      function postDemand() {
+        const crop = document.getElementById("demand-crop")?.value || "Crop";
+        showToast(
+          "📢 Demand for " +
+            crop +
+            " posted! Matching farmers will be notified within 1 hr.",
+        );
+      }
+
+      // ════════════════════════════════
+      // TOAST
+      // ════════════════════════════════
+      function showToast(msg) {
+        document.getElementById("toast-msg").textContent = msg;
+        const t = document.getElementById("toast");
+        t.classList.add("show");
+        setTimeout(() => t.classList.remove("show"), 3500);
+      }
+
+      // ════════════════════════════════
+      // LOAD LIVE LISTINGS — real data from MongoDB via the backend
+      // ════════════════════════════════
+      async function loadFarmerListings() {
+        const grid = document.getElementById("crop-grid");
+        let listings = [];
+        try {
+          listings = await NexoraAPI.getListings({ status: "available" });
+        } catch (err) {
+          console.warn(
+            "Could not load live listings, showing sample listings only:",
+            err.message,
+          );
+          return;
+        }
+        if (!listings.length) return;
+
+        listings
+          .slice()
+          .reverse()
+          .forEach((l) => {
+            const div = document.createElement("div");
+            div.className = "crop-listing";
+            div.dataset.crop = (l.crop || "").toLowerCase();
+            div.dataset.region = (l.district || "").toLowerCase();
+            const farmerName = l.farmer?.name || "Farmer";
+            div.innerHTML = `
+      <div class="crop-emoji">🌱</div>
+      <div class="crop-info"><h4>${l.crop} — Live Listing</h4>
+        <div class="crop-tags"><span class="crop-tag">${l.quantity} ${l.unit || "qtl"}</span><span class="crop-tag">📍 ${l.district || l.region || ""}</span><span class="crop-tag">👨‍🌾 ${farmerName}</span><span class="crop-tag" style="background:rgba(255, 153, 51,0.2);color:var(--gold)">🆕 Live</span></div>
+      </div>
+      <div class="crop-price-block"><div class="crop-price">₹${Number(l.pricePerUnit).toLocaleString("en-IN")}</div><div class="crop-unit">per ${l.unit || "quintal"}</div></div>
+      <div class="crop-actions">
+        <span class="match-badge match-high">LIVE</span>
+        <button class="small-btn small-btn-green" onclick="openBid('${l.crop}','₹${l.pricePerUnit}','${farmerName}','${l.district || ""}','${l._id}')">Place Bid</button>
+        <button class="small-btn small-btn-outline" onclick="openMessage('${farmerName}','${l.crop}','${l._id}','${l.farmer?._id}')">Message</button>
+      </div>`;
+            grid.prepend(div);
+          });
+      }
+
+      // ════════════════════════════════
+      // INIT
+      // ════════════════════════════════
+      window.addEventListener("DOMContentLoaded", async () => {
+        renderBids();
+        renderOrders();
+        await loadConversationsFromBids();
+        renderMessages();
+        NexoraSocket.onMessage(handleIncomingMessage);
+        renderFarmers();
+        await loadFarmerListings();
+        updateMetrics();
+      });
+    </script>
+
+    <!-- Purely decorative visual-effects script — no auth/business logic, no API calls -->
+    <script>
+      (function () {
+        // Preloader
+        window.addEventListener("load", () => {
+          const pl = document.getElementById("preloader");
+          if (pl) setTimeout(() => pl.classList.add("done"), 300);
+        });
+
+        // Custom cursor (dot + lagging ring)
+        const cDot = document.getElementById("cursor-dot");
+        const cRing = document.getElementById("cursor-ring");
+        if (cDot && cRing && window.matchMedia("(pointer:fine)").matches) {
+          let mx = 0, my = 0, rx = 0, ry = 0;
+          document.addEventListener("mousemove", (e) => {
+            mx = e.clientX; my = e.clientY;
+            cDot.style.left = mx + "px"; cDot.style.top = my + "px";
+          });
+          (function animateRing() {
+            rx += (mx - rx) * 0.15; ry += (my - ry) * 0.15;
+            cRing.style.left = rx + "px"; cRing.style.top = ry + "px";
+            requestAnimationFrame(animateRing);
+          })();
+          document.body.addEventListener("mouseover", (e) => {
+            const t = e.target.closest("a, button, .btn, .metric-card, .sidebar-nav li a");
+            if (t) cRing.classList.add("hover");
+          });
+          document.body.addEventListener("mouseout", (e) => {
+            const t = e.target.closest("a, button, .btn, .metric-card, .sidebar-nav li a");
+            if (t) cRing.classList.remove("hover");
+          });
+        }
+
+        // Click burst particles on primary action buttons
+        const BURST_EMOJI = ["🌿", "🍃", "✨", "🌾"];
+        document.body.addEventListener("click", (e) => {
+          const t = e.target.closest(".btn-green, .btn-blue, .small-btn-green");
+          if (!t) return;
+          for (let i = 0; i < 7; i++) {
+            const p = document.createElement("span");
+            p.className = "burst-particle";
+            p.textContent = BURST_EMOJI[Math.floor(Math.random() * BURST_EMOJI.length)];
+            const angle = Math.random() * Math.PI * 2;
+            const dist = 35 + Math.random() * 45;
+            p.style.setProperty("--bx", Math.cos(angle) * dist + "px");
+            p.style.setProperty("--by", Math.sin(angle) * dist + "px");
+            p.style.setProperty("--br", Math.random() * 360 + "deg");
+            p.style.left = e.clientX + "px";
+            p.style.top = e.clientY + "px";
+            document.body.appendChild(p);
+            setTimeout(() => p.remove(), 900);
+          }
+        });
+      })();
+    </script>
+  </body>
+</html>

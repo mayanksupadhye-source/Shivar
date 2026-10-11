@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+<title>Shivar — Choose Your Language / भाषा निवडा</title>
+<meta name="description" content="Shivar connects farmers directly to buyers and industries. Choose your language to begin — मराठी, हिंदी, English, ગુજરાતી, ਪੰਜਾਬੀ."/>
+<meta property="og:title" content="Shivar — Eliminating Middlemen, Empowering Farmers"/>
+<meta property="og:description" content="India's first direct farm-to-industry B2B platform. Choose your language to begin."/>
+<meta property="og:image" content="images/shivar-logo.png"/>
+<meta property="og:type" content="website"/>
+<link rel="icon" href="images/shivar-logo.png" type="image/png"/>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<style>
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --sky: #F0F9FF;
+    --meadow: #F0FDF4;
+    --field: #DCFCE7;
+    --leaf: #15803D;
+    --leaf-deep: #14532D;
+    --lime: #22C55E;
+    --blue: #2563EB;
+    --blue-deep: #1E3A8A;
+    --gold: #FF9933;
+    --cream: #ffffff;
+    --sand: #F8FAFC;
+    --text-main: #17352A;
+    --text-muted: #526B61;
+    --line: rgba(20, 83, 45, 0.16);
+  }
+
+  html, body { height: 100%; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: linear-gradient(180deg, var(--meadow) 0%, var(--sky) 45%, var(--meadow) 100%);
+    color: var(--text-main);
+    overflow-x: hidden;
+    min-height: 100vh;
+  }
+
+  /* ── Ambient background (reuses the homepage's hero aesthetic) ── */
+  #gw-bg {
+    position: fixed; inset: -10%; z-index: 0; pointer-events: none;
+    background:
+      radial-gradient(ellipse 60% 50% at 75% 25%, rgba(37, 99, 235, 0.16) 0%, transparent 70%),
+      radial-gradient(ellipse 45% 55% at 15% 85%, rgba(21, 128, 61, 0.18) 0%, transparent 60%),
+      linear-gradient(160deg, #F0FDF4 0%, #F0F9FF 100%);
+    animation: gwDrift 18s ease-in-out infinite alternate;
+  }
+  #gw-grain {
+    position: fixed; inset: -20%; z-index: 1; pointer-events: none; opacity: 0.02; mix-blend-mode: multiply;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  .gw-petal { position: fixed; z-index: 1; font-size: 1.3rem; opacity: 0.5; animation: gwDriftDown linear infinite; pointer-events: none; }
+  @media (max-width: 700px) { .gw-petal { display: none; } }
+
+  #app { position: relative; z-index: 2; min-height: 100vh; }
+
+  .view {
+    display: none;
+    min-height: 100vh;
+    flex-direction: column; align-items: center; justify-content: center;
+    padding: 3rem 1.5rem;
+    text-align: center;
+  }
+  .view.active { display: flex; }
+  .view.fading-in { animation: gwFadeUp 0.6s cubic-bezier(.16,1,.3,1) both; }
+
+  .visually-hidden {
+    position: absolute; width: 1px; height: 1px; overflow: hidden;
+    clip: rect(0,0,0,0); white-space: nowrap;
+  }
+
+  /* ── VIEW 1: CINEMATIC BRAND INTRO ── */
+  #view-intro { position: relative; overflow: hidden; }
+  #intro-wash {
+    position: fixed; inset: 0; z-index: 4; pointer-events: none;
+    background: radial-gradient(ellipse 80% 70% at 50% 45%, var(--blue-deep) 0%, var(--leaf-deep) 55%, #0b1f14 100%);
+    animation: gwWashOut 1.15s ease-out both;
+  }
+  #intro-particles { position: fixed; inset: 0; z-index: 1; pointer-events: none; }
+  .intro-shockwave {
+    position: fixed; top: 50%; left: 50%; z-index: 2; pointer-events: none;
+    width: 60vmin; height: 60vmin; border-radius: 50%;
+    background: radial-gradient(circle, rgba(255,255,255,0.55) 0%, rgba(21,128,61,0.35) 40%, transparent 72%);
+    transform: translate(-50%,-50%) scale(0); opacity: 0;
+    animation: gwShockwave 1s 0.85s ease-out both;
+  }
+  .intro-sweep {
+    position: fixed; top: -40%; left: -30%; z-index: 3; pointer-events: none;
+    width: 55%; height: 220%;
+    background: linear-gradient(100deg, transparent, rgba(255,255,255,0.65) 45%, rgba(255,153,51,0.4) 55%, transparent);
+    transform: translateX(-140%) rotate(18deg);
+    mix-blend-mode: screen; opacity: 0;
+    animation: gwLightSweep 0.9s 2.85s ease-in both;
+  }
+  #view-intro .intro-logo-wrap {
+    position: relative; z-index: 3;
+    display: flex; flex-direction: column; align-items: center; gap: 1.1rem;
+  }
+  .intro-logo-img {
+    width: 108px; height: 108px; border-radius: 50%;
+    box-shadow: 0 14px 40px rgba(20,83,45,0.4);
+    opacity: 0;
+    animation: gwLogoPunch 0.9s 0.85s cubic-bezier(.2,.9,.25,1.15) both;
+  }
+  .intro-wordmark {
+    font-family: 'Playfair Display', serif; font-size: clamp(2.6rem, 8vw, 4rem); font-weight: 900;
+    letter-spacing: -1px; color: var(--leaf-deep); display: flex;
+  }
+  .intro-wordmark .letter {
+    display: inline-block; opacity: 0; transform: translateY(30px) scale(0.7);
+    animation: gwLetterIn 0.55s cubic-bezier(.16,1,.3,1) both;
+  }
+  .intro-wordmark.gradient-active {
+    background: linear-gradient(120deg, var(--leaf-deep), var(--leaf) 35%, var(--blue) 65%, var(--gold) 85%, var(--leaf-deep));
+    background-size: 320% 100%; -webkit-background-clip: text; background-clip: text;
+    animation: gwGradientSweep 2.4s ease-in-out infinite;
+  }
+  .intro-wordmark.gradient-active .letter { color: transparent; opacity: 1; transform: none; animation: none; }
+  .intro-tagline {
+    position: relative; z-index: 3;
+    font-size: 1.02rem; color: var(--text-muted); max-width: 440px;
+    opacity: 0;
+    animation: gwFadeUp 0.7s 3.1s cubic-bezier(.16,1,.3,1) both;
+  }
+  .intro-tagline .divider { color: var(--line); margin: 0 0.4rem; }
+  .gw-skip {
+    position: fixed; top: 1.4rem; right: 1.4rem; z-index: 5;
+    background: rgba(255,255,255,0.7); border: 1px solid var(--line); color: var(--text-muted);
+    padding: 0.5rem 1.1rem; border-radius: 100px; font-size: 0.82rem; font-weight: 600;
+    cursor: pointer; backdrop-filter: blur(10px); transition: background 0.2s, color 0.2s, border-color 0.2s;
+  }
+  .gw-skip:hover, .gw-skip:focus-visible { background: #fff; color: var(--leaf-deep); border-color: rgba(21,128,61,0.4); }
+
+  /* ── VIEW 2: LANGUAGE SELECTION ── */
+  .lang-headings { margin-bottom: 2.6rem; max-width: 700px; }
+  .lang-heading-primary {
+    font-family: 'Playfair Display', serif; font-weight: 900;
+    font-size: clamp(2rem, 5vw, 2.8rem); color: var(--leaf-deep); line-height: 1.15;
+    animation: gwFadeUp 0.7s cubic-bezier(.16,1,.3,1) both;
+  }
+  .lang-heading-alts {
+    margin-top: 0.9rem; font-size: 0.95rem; color: var(--text-muted);
+    display: flex; flex-wrap: wrap; gap: 0.5rem 0.9rem; justify-content: center;
+    animation: gwFadeUp 0.7s 0.1s cubic-bezier(.16,1,.3,1) both;
+  }
+  .lang-heading-alts span:not(:last-child)::after { content: '•'; margin-left: 0.9rem; color: var(--line); }
+
+  .lang-grid {
+    display: grid; grid-template-columns: repeat(3, minmax(150px, 220px)); gap: 1.1rem;
+    max-width: 760px; width: 100%;
+  }
+  .lang-card {
+    font: inherit; color: inherit; text-align: left; cursor: pointer;
+    background: rgba(255,255,255,0.85); border: 1.5px solid var(--line);
+    border-radius: 16px; padding: 1.5rem 1.3rem;
+    box-shadow: 0 10px 30px rgba(30,58,138,0.06);
+    transition: transform 0.3s, border-color 0.3s, box-shadow 0.3s, background 0.3s;
+    opacity: 0; transform: translateY(18px);
+    animation: gwFadeUp 0.55s cubic-bezier(.16,1,.3,1) forwards;
+  }
+  .lang-card:hover, .lang-card:focus-visible {
+    transform: translateY(-5px) scale(1.02);
+    border-color: rgba(21,128,61,0.55);
+    box-shadow: 0 20px 44px rgba(30,58,138,0.16);
+    background: rgba(255,255,255,0.97);
+    outline: none;
+  }
+  .lang-card:focus-visible { outline: 2px solid var(--blue); outline-offset: 3px; }
+  .lang-native {
+    font-family: 'Playfair Display', serif; font-weight: 900;
+    font-size: 1.5rem; color: var(--leaf-deep); margin-bottom: 0.5rem; display: block;
+  }
+  .lang-cta {
+    font-size: 0.85rem; font-weight: 600; color: var(--blue-deep);
+    display: inline-flex; align-items: center; gap: 0.3rem;
+  }
+  .lang-card .lang-arrow { transition: transform 0.25s; display: inline-block; }
+  .lang-card:hover .lang-arrow, .lang-card:focus-visible .lang-arrow { transform: translateX(4px); }
+
+  /* ── VIEW 3: STORY / INTRO ── */
+  .story-card { max-width: 640px; width: 100%; }
+  .story-eyebrow {
+    font-size: 0.78rem; text-transform: uppercase; letter-spacing: 2px;
+    color: var(--leaf-deep); font-weight: 700; margin-bottom: 0.9rem;
+  }
+  .story-title {
+    font-family: 'Playfair Display', serif; font-weight: 900;
+    font-size: clamp(1.7rem, 4.5vw, 2.5rem); line-height: 1.2; margin-bottom: 1.2rem; color: var(--text-main);
+  }
+  .story-body { font-size: 1.05rem; color: var(--text-muted); line-height: 1.75; max-width: 560px; margin: 0 auto; }
+  .story-tagline {
+    font-family: 'Playfair Display', serif; font-weight: 900;
+    font-size: clamp(1.6rem, 4vw, 2.3rem); color: var(--leaf-deep); line-height: 1.3;
+  }
+  .story-items {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.9rem; margin-top: 0.5rem;
+  }
+  .story-item {
+    background: rgba(255,255,255,0.85); border: 1px solid var(--line); border-radius: 12px;
+    padding: 1rem 0.7rem; font-size: 0.88rem; font-weight: 600; color: var(--text-main);
+    box-shadow: 0 6px 18px rgba(30,58,138,0.05);
+  }
+  .story-dots { display: flex; gap: 0.5rem; margin: 2rem 0 1.6rem; }
+  .story-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--line); transition: background 0.3s, transform 0.3s; }
+  .story-dot.active { background: var(--leaf); transform: scale(1.3); }
+  .story-actions { display: flex; align-items: center; gap: 1.2rem; flex-wrap: wrap; justify-content: center; }
+
+  .btn-primary {
+    position: relative; overflow: hidden; font: inherit;
+    background: linear-gradient(135deg, var(--leaf), var(--blue));
+    color: #fff; padding: 0.9rem 2rem; border: none; border-radius: 8px;
+    text-decoration: none; font-weight: 600; font-size: 1rem; cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+    box-shadow: 0 8px 26px rgba(21,128,61,0.32);
+  }
+  .btn-primary:hover, .btn-primary:focus-visible { transform: translateY(-2px) scale(1.03); box-shadow: 0 14px 36px rgba(37,99,235,0.45); outline: none; }
+  .btn-primary:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+
+  .link-plain {
+    font: inherit; background: none; border: none; cursor: pointer;
+    color: var(--text-muted); font-size: 0.9rem; font-weight: 600; text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  .link-plain:hover, .link-plain:focus-visible { color: var(--leaf-deep); }
+
+  /* ── ANIMATIONS ── */
+  @keyframes gwFadeUp { from { opacity: 0; transform: translateY(22px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes gwLogoPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.06); } }
+  @keyframes gwGradientSweep { 0%, 100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
+  @keyframes gwDrift { 0% { transform: translate(0,0) rotate(0deg); } 100% { transform: translate(-2%,2%) rotate(2deg); } }
+  @keyframes gwWashOut { 0% { opacity: 1; } 20% { opacity: 1; } 100% { opacity: 0; visibility: hidden; } }
+  @keyframes gwShockwave {
+    0% { transform: translate(-50%,-50%) scale(0); opacity: 0.9; }
+    60% { opacity: 0.5; }
+    100% { transform: translate(-50%,-50%) scale(1.6); opacity: 0; }
+  }
+  @keyframes gwLogoPunch {
+    0% { opacity: 0; transform: scale(0.15) rotate(-25deg); filter: blur(6px); }
+    55% { opacity: 1; transform: scale(1.22) rotate(4deg); filter: blur(0); }
+    75% { transform: scale(0.94) rotate(-2deg); }
+    100% { opacity: 1; transform: scale(1) rotate(0deg); filter: blur(0); }
+  }
+  @keyframes gwLetterIn { from { opacity: 0; transform: translateY(30px) scale(0.7); } to { opacity: 1; transform: translateY(0) scale(1); } }
+  @keyframes gwLightSweep {
+    0% { transform: translateX(-140%) rotate(18deg); opacity: 0; }
+    15% { opacity: 1; }
+    85% { opacity: 1; }
+    100% { transform: translateX(260%) rotate(18deg); opacity: 0; }
+  }
+  @keyframes gwDriftDown {
+    0% { transform: translateY(-10%) translateX(0) rotate(0deg); opacity: 0; }
+    10% { opacity: 0.5; } 90% { opacity: 0.4; }
+    100% { transform: translateY(110vh) translateX(24px) rotate(180deg); opacity: 0; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; }
+  }
+
+  @media (max-width: 640px) {
+    .lang-grid { grid-template-columns: 1fr 1fr; max-width: 420px; }
+    .story-items { grid-template-columns: 1fr 1fr; }
+  }
+  @media (max-width: 400px) {
+    .lang-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div id="gw-bg"></div>
+<div id="gw-grain"></div>
+<span class="gw-petal" style="left:10%; animation-duration:15s; animation-delay:0s;">🌿</span>
+<span class="gw-petal" style="left:35%; animation-duration:19s; animation-delay:3s; font-size:1rem;">🍃</span>
+<span class="gw-petal" style="left:65%; animation-duration:17s; animation-delay:1s;">🌾</span>
+<span class="gw-petal" style="left:85%; animation-duration:20s; animation-delay:5s; font-size:1rem;">🍃</span>
+
+<button type="button" class="gw-skip" id="gw-skip-btn" hidden>Skip</button>
+
+<div id="app">
+
+  <!-- VIEW 1: CINEMATIC BRAND INTRO -->
+  <section class="view" id="view-intro" aria-label="Shivar introduction">
+    <div id="intro-wash" aria-hidden="true"></div>
+    <canvas id="intro-particles" aria-hidden="true"></canvas>
+    <div class="intro-shockwave" aria-hidden="true"></div>
+    <div class="intro-sweep" aria-hidden="true"></div>
+    <div class="intro-logo-wrap">
+      <img src="images/shivar-logo.png" alt="Shivar" class="intro-logo-img" onerror="this.style.display='none'">
+      <h1 class="intro-wordmark" id="intro-wordmark" aria-label="Shivar">
+        <span class="letter" style="animation-delay:1.75s" aria-hidden="true">S</span>
+        <span class="letter" style="animation-delay:1.83s" aria-hidden="true">h</span>
+        <span class="letter" style="animation-delay:1.91s" aria-hidden="true">i</span>
+        <span class="letter" style="animation-delay:1.99s" aria-hidden="true">v</span>
+        <span class="letter" style="animation-delay:2.07s" aria-hidden="true">a</span>
+        <span class="letter" style="animation-delay:2.15s" aria-hidden="true">r</span>
+      </h1>
+      <p class="intro-tagline">Farm to market, directly<span class="divider">•</span>शेतापासून बाजारापर्यंत, थेट</p>
+    </div>
+  </section>
+
+  <!-- VIEW 2: LANGUAGE SELECTION -->
+  <section class="view" id="view-language" aria-label="Choose your language">
+    <div class="lang-headings">
+      <h1 class="lang-heading-primary">आपली भाषा निवडा</h1>
+      <div class="lang-heading-alts">
+        <span lang="hi">अपनी भाषा चुनें</span>
+        <span lang="en">Choose your language</span>
+        <span lang="gu">તમારી ભાષા પસંદ કરો</span>
+        <span lang="pa">ਆਪਣੀ ਭਾਸ਼ਾ ਚੁਣੋ</span>
+      </div>
+    </div>
+    <div class="lang-grid" id="lang-grid" role="list">
+      <button type="button" class="lang-card" role="listitem" data-lang="mr" lang="mr" style="animation-delay:.05s">
+        <span class="lang-native">मराठी</span>
+        <span class="lang-cta">मराठीत पुढे जा <span class="lang-arrow" aria-hidden="true">→</span></span>
+      </button>
+      <button type="button" class="lang-card" role="listitem" data-lang="hi" lang="hi" style="animation-delay:.12s">
+        <span class="lang-native">हिंदी</span>
+        <span class="lang-cta">हिंदी में आगे बढ़ें <span class="lang-arrow" aria-hidden="true">→</span></span>
+      </button>
+      <button type="button" class="lang-card" role="listitem" data-lang="en" lang="en" style="animation-delay:.19s">
+        <span class="lang-native">English</span>
+        <span class="lang-cta">Continue in English <span class="lang-arrow" aria-hidden="true">→</span></span>
+      </button>
+      <button type="button" class="lang-card" role="listitem" data-lang="gu" lang="gu" style="animation-delay:.26s">
+        <span class="lang-native">ગુજરાતી</span>
+        <span class="lang-cta">ગુજરાતીમાં આગળ વધો <span class="lang-arrow" aria-hidden="true">→</span></span>
+      </button>
+      <button type="button" class="lang-card" role="listitem" data-lang="pa" lang="pa" style="animation-delay:.33s">
+        <span class="lang-native">ਪੰਜਾਬੀ</span>
+        <span class="lang-cta">ਪੰਜਾਬੀ ਵਿੱਚ ਅੱਗੇ ਵਧੋ <span class="lang-arrow" aria-hidden="true">→</span></span>
+      </button>
+    </div>
+  </section>
+
+  <!-- VIEW 3: LOCALIZED STORY -->
+  <section class="view" id="view-story" aria-label="About Shivar" aria-live="polite">
+    <div class="story-card" id="story-slide-content"></div>
+    <div class="story-dots" id="story-dots" aria-hidden="true"></div>
+    <div class="story-actions">
+      <button type="button" class="link-plain" id="story-skip-btn">Skip Intro</button>
+      <button type="button" class="btn-primary" id="story-next-btn">Next</button>
+    </div>
+  </section>
+
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var params = new URLSearchParams(location.search);
+  var isChangeLang = params.has('changeLang');
+  var isStoryReplay = params.has('story');
+  var langFromUrl = params.get('lang');
+  var reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  var FALLBACK_LOCALE = {
+    ui: { skip: 'Skip', next: 'Next', enter: 'Enter Shivar', skipIntro: 'Skip Intro', back: 'Back' },
+    story: {
+      slide1: { eyebrow: 'The Challenge', title: "Your crop is ready. Now what?",
+        body: "Today's market price. Where the demand is. The right buyer. The weather ahead. Government schemes. A nearby FPO. So many questions, so little time." },
+      slide2: { eyebrow: 'SHIVAR', title: 'Everything a farmer needs, in one place',
+        items: ['Marketplace','Market Intelligence','Climate & Weather','Smart Matching','FPO Network','Government Schemes'] },
+      slide3: { eyebrow: 'Our Promise', tagline: 'From your field to the right market.' }
+    }
+  };
+
+  var views = {
+    intro: document.getElementById('view-intro'),
+    language: document.getElementById('view-language'),
+    story: document.getElementById('view-story')
+  };
+  var skipBtn = document.getElementById('gw-skip-btn');
+  var langGrid = document.getElementById('lang-grid');
+  var storySlideEl = document.getElementById('story-slide-content');
+  var storyDotsEl = document.getElementById('story-dots');
+  var storySkipBtn = document.getElementById('story-skip-btn');
+  var storyNextBtn = document.getElementById('story-next-btn');
+
+  var selectedLang = langFromUrl || null;
+  var locale = FALLBACK_LOCALE;
+  var slideIndex = 0;
+  var slideKeys = ['slide1', 'slide2', 'slide3'];
+
+  function showView(name) {
+    Object.keys(views).forEach(function (key) {
+      views[key].classList.remove('active', 'fading-in');
+    });
+    views[name].classList.add('active');
+    if (!reducedMotion) {
+      requestAnimationFrame(function () { views[name].classList.add('fading-in'); });
+    }
+  }
+
+  function goToLanguageSelect() {
+    skipBtn.hidden = true;
+    showView('language');
+  }
+
+  function loadLocale(code, callback) {
+    fetch('locales/' + code + '.json')
+      .then(function (res) { if (!res.ok) throw new Error('not ok'); return res.json(); })
+      .then(function (data) { callback(data); })
+      .catch(function () { callback(FALLBACK_LOCALE); });
+  }
+
+  function renderStorySlide() {
+    var key = slideKeys[slideIndex];
+    var slide = (locale.story && locale.story[key]) || FALLBACK_LOCALE.story[key];
+    var html = '<div class="story-eyebrow">' + escapeHtml(slide.eyebrow || '') + '</div>';
+
+    if (slideIndex === 0) {
+      html += '<h2 class="story-title">' + escapeHtml(slide.title) + '</h2>';
+      html += '<p class="story-body">' + escapeHtml(slide.body) + '</p>';
+    } else if (slideIndex === 1) {
+      html += '<h2 class="story-title">' + escapeHtml(slide.title) + '</h2>';
+      html += '<div class="story-items">' + (slide.items || []).map(function (item) {
+        return '<div class="story-item">' + escapeHtml(item) + '</div>';
+      }).join('') + '</div>';
+    } else {
+      html += '<p class="story-tagline">' + escapeHtml(slide.tagline) + '</p>';
+    }
+    storySlideEl.innerHTML = html;
+
+    storyDotsEl.innerHTML = slideKeys.map(function (_, i) {
+      return '<span class="story-dot' + (i === slideIndex ? ' active' : '') + '"></span>';
+    }).join('');
+
+    var ui = locale.ui || FALLBACK_LOCALE.ui;
+    storySkipBtn.textContent = ui.skipIntro;
+    storyNextBtn.textContent = (slideIndex === slideKeys.length - 1) ? ui.enter : ui.next;
+  }
+
+  function goToStory() {
+    slideIndex = 0;
+    loadLocale(selectedLang || 'en', function (data) {
+      locale = data;
+      renderStorySlide();
+      showView('story');
+    });
+  }
+
+  function finishOnboarding() {
+    location.href = 'home.html?lang=' + (selectedLang || 'en');
+  }
+
+  function selectLanguage(code) {
+    selectedLang = code;
+    if (isChangeLang) {
+      // Returning user just switching language — no need to replay the story.
+      location.href = 'home.html?lang=' + code;
+      return;
+    }
+    goToStory();
+  }
+
+  function escapeHtml(str) {
+    var div = document.createElement('div');
+    div.textContent = str == null ? '' : String(str);
+    return div.innerHTML;
+  }
+
+  // Language card interactions
+  langGrid.addEventListener('click', function (e) {
+    var card = e.target.closest('.lang-card');
+    if (card) selectLanguage(card.dataset.lang);
+  });
+
+  // Story navigation
+  storyNextBtn.addEventListener('click', function () {
+    if (slideIndex < slideKeys.length - 1) {
+      slideIndex += 1;
+      renderStorySlide();
+    } else {
+      finishOnboarding();
+    }
+  });
+  storySkipBtn.addEventListener('click', finishOnboarding);
+
+  // Brand-intro skip
+  skipBtn.addEventListener('click', goToLanguageSelect);
+
+  // ── Converging particle network (background of the cinematic intro) ──
+  function startIntroParticles() {
+    var canvas = document.getElementById('intro-particles');
+    if (!canvas) return;
+    var ctx = canvas.getContext('2d');
+    var w, h, particles = [];
+    var COUNT = matchMedia('(max-width:700px)').matches ? 30 : 60;
+    var CONVERGE_MS = 1600;
+    var startTime = performance.now();
+
+    function resize() { w = canvas.width = window.innerWidth; h = canvas.height = window.innerHeight; }
+    function init() {
+      var cx = w / 2, cy = h / 2;
+      particles = Array.from({ length: COUNT }, function () {
+        var angle = Math.random() * Math.PI * 2;
+        var dist = Math.min(w, h) * (0.35 + Math.random() * 0.35);
+        var sx = cx + Math.cos(angle) * dist, sy = cy + Math.sin(angle) * dist;
+        return { sx: sx, sy: sy, x: sx, y: sy, vx: (Math.random() - 0.5) * 0.3, vy: (Math.random() - 0.5) * 0.3, r: Math.random() * 1.6 + 0.8 };
+      });
+    }
+    function tick(now) {
+      if (!views.intro.classList.contains('active')) return; // stop once we've moved on
+      var t = Math.min((now - startTime) / CONVERGE_MS, 1);
+      var ease = 1 - Math.pow(1 - t, 3);
+      var cx = w / 2, cy = h / 2;
+      ctx.clearRect(0, 0, w, h);
+      particles.forEach(function (p) {
+        if (t < 1) {
+          p.x = p.sx + (cx - p.sx) * ease * 0.55;
+          p.y = p.sy + (cy - p.sy) * ease * 0.55;
+        } else {
+          p.x += p.vx; p.y += p.vy;
+          if (p.x < 0 || p.x > w) p.vx *= -1;
+          if (p.y < 0 || p.y > h) p.vy *= -1;
+        }
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(21,128,61,0.5)'; ctx.fill();
+      });
+      for (var i = 0; i < particles.length; i++) {
+        for (var j = i + 1; j < particles.length; j++) {
+          var a = particles[i], b = particles[j];
+          var dx = a.x - b.x, dy = a.y - b.y, dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist < 110) {
+            ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
+            ctx.strokeStyle = 'rgba(37,99,235,' + (0.2 * (1 - dist / 110)) + ')';
+            ctx.lineWidth = 1; ctx.stroke();
+          }
+        }
+      }
+      requestAnimationFrame(tick);
+    }
+    resize(); init(); requestAnimationFrame(tick);
+    window.addEventListener('resize', function () { resize(); });
+  }
+
+  // ── Entry routing ──
+  if (isStoryReplay) {
+    // "How Shivar Works" link from the homepage: replay just the story, in the saved language.
+    goToStory();
+  } else if (isChangeLang) {
+    // Language switcher from the homepage: go straight to language selection.
+    goToLanguageSelect();
+  } else {
+    // First-time flow: cinematic brand intro, then language selection.
+    showView('intro');
+    skipBtn.hidden = false;
+    if (!reducedMotion) {
+      startIntroParticles();
+      setTimeout(function () {
+        var mark = document.getElementById('intro-wordmark');
+        if (mark) mark.classList.add('gradient-active');
+      }, 2900);
+    }
+    var introDelay = reducedMotion ? 500 : 4700;
+    var introTimer = setTimeout(goToLanguageSelect, introDelay);
+    skipBtn.addEventListener('click', function () { clearTimeout(introTimer); }, { once: true });
+  }
+})();
+</script>
+
+</body>
+</html>

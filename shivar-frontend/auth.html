@@ -1,0 +1,1669 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Shivar — Secure Login</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      *,
+      *::before,
+      *::after {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      :root {
+        --dark: #17352A;
+        --mid: #ffffff;
+        --leaf: #15803D;
+        --leaf-deep: #14532D;
+        --lime: #22C55E;
+        --gold: #FF9933;
+        --cream: #17352A;
+        --muted: #526B61;
+        --red: #DC2626;
+        --blue: #2563EB;
+        --blue-deep: #1E3A8A;
+        --text-main: #17352A;
+        --line: rgba(20, 83, 45, 0.16);
+      }
+      body {
+        font-family: "DM Sans", sans-serif;
+        background: linear-gradient(180deg, #F0FDF4 0%, #F0F9FF 45%, #F0FDF4 100%);
+        color: var(--cream);
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 2rem;
+        overflow-x: hidden;
+      }
+
+      /* ── CUSTOM CURSOR ── */
+      @media (pointer: fine) {
+        body { cursor: none; }
+        a, button, .submit-btn, .otp-btn, .tab, .role-btn, .aadhaar-eye { cursor: none; }
+      }
+      #cursor-dot, #cursor-ring {
+        position: fixed; top: 0; left: 0; pointer-events: none; z-index: 9999;
+        border-radius: 50%; transform: translate(-50%,-50%);
+      }
+      #cursor-dot { width: 7px; height: 7px; background: var(--leaf); opacity: 0.9; }
+      #cursor-ring {
+        width: 34px; height: 34px; border: 1.5px solid rgba(21, 128, 61,0.55);
+        transition: width 0.25s, height 0.25s, border-color 0.25s, background 0.25s;
+      }
+      #cursor-ring.hover { width: 58px; height: 58px; border-color: rgba(37, 99, 235,0.7); background: rgba(21, 128, 61,0.08); }
+      @media (max-width: 640px), (pointer: coarse) {
+        #cursor-dot, #cursor-ring { display: none !important; }
+        body, a, button { cursor: auto; }
+      }
+
+      /* ── PRELOADER ── */
+      #preloader {
+        position: fixed; inset: 0; z-index: 10000;
+        background: linear-gradient(160deg, #F0FDF4 0%, #F0F9FF 100%);
+        display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 1rem;
+        transition: opacity 0.6s ease, visibility 0.6s ease;
+      }
+      #preloader .pl-mark {
+        font-family: "Playfair Display", serif; font-size: 2.2rem; font-weight: 900;
+        background: linear-gradient(120deg, var(--leaf-deep), var(--leaf) 40%, var(--blue) 70%, var(--leaf-deep));
+        background-size: 300% 100%; -webkit-background-clip: text; background-clip: text; color: transparent;
+        animation: gradientSweep 1.6s ease-in-out infinite;
+      }
+      #preloader .pl-bar { width: 150px; height: 3px; border-radius: 3px; background: rgba(21, 128, 61,0.15); overflow: hidden; }
+      #preloader .pl-bar::after {
+        content: ''; display: block; height: 100%; width: 40%;
+        background: linear-gradient(90deg, var(--leaf), var(--blue));
+        animation: plLoad 1s ease-in-out infinite;
+      }
+      @keyframes plLoad { 0% { transform: translateX(-100%); } 100% { transform: translateX(350%); } }
+      #preloader.done { opacity: 0; visibility: hidden; }
+
+      /* ── GRAIN OVERLAY ── */
+      #page-grain {
+        position: fixed; inset: -20%; z-index: 5; pointer-events: none; opacity: 0.02; mix-blend-mode: multiply;
+        background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+        animation: grainShift 1.2s steps(4) infinite;
+      }
+      @keyframes grainShift {
+        0% { transform: translate(0,0); } 25% { transform: translate(-1%,1%); }
+        50% { transform: translate(1%,-1%); } 75% { transform: translate(-1%,-1%); } 100% { transform: translate(0,0); }
+      }
+
+      /* ── SCROLLBAR ── */
+      ::-webkit-scrollbar { width: 10px; }
+      ::-webkit-scrollbar-track { background: #F0FDF4; }
+      ::-webkit-scrollbar-thumb { background: linear-gradient(180deg, var(--leaf), var(--blue)); border-radius: 10px; }
+      html { scrollbar-color: #15803D #F0FDF4; }
+
+      /* ── ROTATING GRADIENT GLOW BORDER ── */
+      .glow-border { position: relative; }
+      .glow-border::after {
+        content: ''; position: absolute; inset: -1.5px; border-radius: inherit; padding: 1.5px;
+        background: conic-gradient(from 0deg, var(--leaf), var(--blue), var(--gold), var(--leaf));
+        -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+        -webkit-mask-composite: xor; mask-composite: exclude;
+        opacity: 0; transition: opacity 0.4s; animation: spinBorder 3s linear infinite; pointer-events: none;
+      }
+      .glow-border.always::after,
+      .glow-border:hover::after { opacity: 1; }
+      @keyframes spinBorder { to { transform: rotate(360deg); } }
+
+      /* ── CLICK BURST PARTICLES ── */
+      .burst-particle {
+        position: fixed; z-index: 9997; pointer-events: none; font-size: 1rem;
+        animation: burstFly 0.9s ease-out forwards;
+      }
+      @keyframes burstFly {
+        to { transform: translate(var(--bx), var(--by)) rotate(var(--br)); opacity: 0; }
+      }
+
+      /* ── SLIDING TAB INDICATOR (defined with .tabs below) ── */
+
+      .bg {
+        position: fixed;
+        inset: -10%;
+        z-index: 0;
+        background:
+          radial-gradient(
+            ellipse 60% 60% at 30% 40%,
+            rgba(21, 128, 61, 0.18) 0%,
+            transparent 70%
+          ),
+          radial-gradient(
+            ellipse 40% 50% at 80% 70%,
+            rgba(37, 99, 235, 0.16) 0%,
+            transparent 60%
+          ),
+          linear-gradient(160deg, #F0FDF4 0%, #F0F9FF 100%);
+        animation: heroDrift 16s ease-in-out infinite alternate;
+      }
+      .orb {
+        position: fixed; border-radius: 50%; filter: blur(60px);
+        opacity: 0.5; z-index: 0; pointer-events: none;
+      }
+      .orb1 { width: 300px; height: 300px; background: radial-gradient(circle, var(--leaf), transparent 70%); top: 8%; right: 10%; animation: floatBlob 9s ease-in-out infinite; }
+      .orb2 { width: 260px; height: 260px; background: radial-gradient(circle, var(--blue), transparent 70%); bottom: 8%; left: 6%; animation: floatBlob 11s ease-in-out infinite reverse; }
+      .orb3 { width: 150px; height: 150px; background: radial-gradient(circle, var(--gold), transparent 70%); top: 45%; left: 46%; animation: floatBlob 7s ease-in-out infinite; opacity: 0.3; }
+      #cursor-glow {
+        position: fixed; width: 380px; height: 380px; border-radius: 50%;
+        background: radial-gradient(circle, rgba(21, 128, 61,0.14), rgba(37, 99, 235,0.08) 45%, transparent 70%);
+        pointer-events: none; z-index: 0; transform: translate(-50%,-50%);
+        left: 0; top: 0; opacity: 0; transition: opacity 0.4s ease;
+      }
+      @keyframes heroDrift {
+        0%   { transform: translate(0,0) rotate(0deg); }
+        100% { transform: translate(-2%,2%) rotate(2deg); }
+      }
+      @keyframes floatBlob {
+        0%, 100% { transform: translate(0,0) scale(1); }
+        50%      { transform: translate(-18px, 22px) scale(1.08); }
+      }
+      @media (max-width: 640px) {
+        .orb, #cursor-glow { display: none; }
+      }
+      @media (pointer: coarse) {
+        #cursor-glow { display: none; }
+      }
+      .container {
+        position: relative;
+        z-index: 1;
+        width: 100%;
+        max-width: 520px;
+        animation: fadeUpIn 0.7s cubic-bezier(.16,1,.3,1) both;
+      }
+      .logo {
+        text-align: center;
+        margin-bottom: 2rem;
+      }
+      .logo h1 {
+        font-family: "Playfair Display", serif;
+        font-size: 2.2rem;
+        font-weight: 900;
+        background: linear-gradient(120deg, var(--leaf-deep), var(--leaf) 40%, var(--blue) 70%, var(--leaf-deep));
+        background-size: 300% 100%;
+        -webkit-background-clip: text; background-clip: text; color: transparent;
+        animation: gradientSweep 6s ease-in-out infinite;
+      }
+      .logo h1 span {
+        background: linear-gradient(120deg, var(--blue-deep), var(--blue) 40%, var(--leaf) 70%, var(--blue-deep));
+        background-size: 300% 100%;
+        -webkit-background-clip: text; background-clip: text; color: transparent;
+        animation: gradientSweep 6s ease-in-out infinite;
+      }
+      .logo p {
+        font-size: 0.85rem;
+        color: var(--muted);
+        margin-top: 0.3rem;
+      }
+      .card {
+        background: rgba(255, 255, 255, 0.82);
+        backdrop-filter: blur(16px);
+        border: 1px solid var(--line);
+        border-radius: 20px;
+        padding: 2.5rem;
+        box-shadow: 0 30px 80px rgba(30, 58, 138, 0.18);
+        animation: fadeUpIn 0.8s 0.1s cubic-bezier(.16,1,.3,1) both;
+      }
+      @keyframes fadeUpIn {
+        from { opacity: 0; transform: translateY(24px) scale(0.98); }
+        to   { opacity: 1; transform: translateY(0) scale(1); }
+      }
+      @keyframes gradientSweep {
+        0%, 100% { background-position: 0% 50%; }
+        50%      { background-position: 100% 50%; }
+      }
+      /* TABS */
+      .tabs {
+        position: relative;
+        display: flex;
+        background: var(--field, #F8FAFC);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 4px;
+        margin-bottom: 2rem;
+      }
+      #tab-indicator {
+        position: absolute; top: 4px; bottom: 4px; left: 4px;
+        width: calc(50% - 4px); border-radius: 8px;
+        background: linear-gradient(135deg, var(--leaf), var(--blue));
+        box-shadow: 0 6px 18px rgba(21, 128, 61,0.3);
+        transition: transform 0.35s cubic-bezier(.65,0,.35,1);
+        z-index: 0;
+      }
+      .tab {
+        position: relative; z-index: 1;
+        flex: 1;
+        padding: 0.6rem;
+        text-align: center;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 0.88rem;
+        font-weight: 600;
+        color: var(--muted);
+        transition: color 0.25s cubic-bezier(.4,0,.2,1);
+      }
+      .tab:hover { color: var(--leaf-deep); }
+      .tab.active {
+        color: #fff;
+      }
+      /* ROLE SELECT */
+      .role-select {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 0.6rem;
+        margin-bottom: 1.5rem;
+      }
+      .role-btn {
+        padding: 0.7rem;
+        border-radius: 10px;
+        border: 1px solid var(--line);
+        background: var(--field, #F8FAFC);
+        color: var(--muted);
+        cursor: pointer;
+        text-align: center;
+        transition: all 0.2s;
+        font-size: 0.82rem;
+        font-weight: 600;
+      }
+      .role-btn:hover { transform: translateY(-2px); border-color: rgba(21, 128, 61,0.4); }
+      .role-btn .role-icon {
+        font-size: 1.4rem;
+        display: block;
+        margin-bottom: 0.3rem;
+      }
+      .role-btn.active {
+        border-color: var(--leaf);
+        background: rgba(21, 128, 61, 0.12);
+        color: var(--leaf-deep);
+        animation: rolePop 0.35s ease;
+      }
+      @keyframes rolePop {
+        0%   { transform: scale(0.92); }
+        60%  { transform: scale(1.05); }
+        100% { transform: scale(1); }
+      }
+      /* FORM */
+      .form-section {
+        display: none;
+      }
+      .form-section.active {
+        display: block;
+        animation: fadeUpIn 0.5s cubic-bezier(.16,1,.3,1) both;
+      }
+      .section-divider {
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 1.5px;
+        color: var(--leaf-deep);
+        font-weight: 700;
+        margin: 1.2rem 0 0.8rem;
+        padding-bottom: 0.4rem;
+        border-bottom: 1px solid var(--line);
+      }
+      .form-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.8rem;
+      }
+      .fg {
+        margin-bottom: 0.9rem;
+      }
+      .fg label {
+        display: block;
+        font-size: 0.78rem;
+        color: var(--muted);
+        margin-bottom: 0.35rem;
+        font-weight: 500;
+      }
+      .fg input,
+      .fg select {
+        width: 100%;
+        background: rgba(255, 255, 255, 0.9);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 0.7rem 0.9rem;
+        color: var(--text-main);
+        font-family: "DM Sans", sans-serif;
+        font-size: 0.88rem;
+        transition: border-color 0.2s, box-shadow 0.2s;
+      }
+      .fg input:focus,
+      .fg select:focus {
+        outline: none;
+        border-color: var(--leaf);
+        box-shadow: 0 0 0 3px rgba(21, 128, 61, 0.15);
+      }
+      .fg input.error {
+        border-color: var(--red);
+      }
+      .fg .hint {
+        font-size: 0.72rem;
+        color: var(--muted);
+        margin-top: 0.25rem;
+      }
+      .fg .err-msg {
+        font-size: 0.72rem;
+        color: var(--red);
+        margin-top: 0.25rem;
+        display: none;
+      }
+      .fg select option {
+        background: #fff;
+        color: var(--text-main);
+      }
+      /* OTP row */
+      .otp-row {
+        display: flex;
+        gap: 0.5rem;
+      }
+      .otp-row input {
+        flex: 1;
+      }
+      .otp-btn {
+        position: relative;
+        overflow: hidden;
+        background: linear-gradient(135deg, var(--leaf), var(--blue));
+        color: #fff;
+        border: none;
+        border-radius: 8px;
+        padding: 0.7rem 1rem;
+        font-size: 0.78rem;
+        font-weight: 600;
+        cursor: pointer;
+        white-space: nowrap;
+        transition: transform 0.2s, box-shadow 0.2s;
+        box-shadow: 0 4px 14px rgba(21, 128, 61,0.28);
+      }
+      .otp-btn:hover {
+        transform: translateY(-1px) scale(1.03);
+        box-shadow: 0 8px 22px rgba(37, 99, 235,0.38);
+      }
+      /* Aadhaar masked */
+      .aadhaar-wrap {
+        position: relative;
+      }
+      .aadhaar-wrap input {
+        padding-right: 2.5rem;
+      }
+      .aadhaar-eye {
+        position: absolute;
+        right: 0.7rem;
+        top: 50%;
+        transform: translateY(-50%);
+        cursor: pointer;
+        font-size: 0.9rem;
+        color: var(--muted);
+        transition: transform 0.2s;
+      }
+      .aadhaar-eye:hover { transform: translateY(-50%) scale(1.15); }
+      /* Vehicle rows (Logistics Partner signup) */
+      .vehicle-row {
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+        margin-bottom: 0.5rem;
+      }
+      .vehicle-row input,
+      .vehicle-row select {
+        flex: 1;
+        background: rgba(255, 255, 255, 0.9);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 0.6rem 0.8rem;
+        font-family: "DM Sans", sans-serif;
+        font-size: 0.85rem;
+        color: var(--text-main);
+      }
+      .removeVehicle {
+        flex-shrink: 0;
+        width: 34px;
+        height: 34px;
+        border-radius: 8px;
+        border: 1.5px solid rgba(220, 38, 38, 0.35);
+        background: none;
+        color: var(--red);
+        cursor: pointer;
+        font-size: 0.9rem;
+      }
+      /* Password strength */
+      .pwd-strength {
+        display: flex;
+        gap: 4px;
+        margin-top: 0.4rem;
+      }
+      .pwd-bar {
+        flex: 1;
+        height: 3px;
+        border-radius: 2px;
+        background: rgba(23, 53, 42, 0.1);
+        transition: background 0.3s, transform 0.3s;
+      }
+      .pwd-bar.weak {
+        background: var(--red);
+      }
+      .pwd-bar.medium {
+        background: var(--gold);
+      }
+      .pwd-bar.strong {
+        background: var(--leaf);
+        transform: scaleY(1.4);
+      }
+      /* Submit */
+      .submit-btn {
+        position: relative;
+        overflow: hidden;
+        width: 100%;
+        background: linear-gradient(135deg, var(--leaf), var(--blue));
+        color: #fff;
+        border: none;
+        border-radius: 10px;
+        padding: 0.9rem;
+        font-size: 1rem;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.2s;
+        margin-top: 0.5rem;
+        box-shadow: 0 8px 24px rgba(21, 128, 61, 0.3);
+        will-change: transform;
+      }
+      .submit-btn:hover {
+        transform: translateY(-2px) scale(1.02);
+        box-shadow: 0 14px 34px rgba(37, 99, 235, 0.4);
+      }
+      .submit-btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+        transform: none;
+      }
+      .ripple {
+        position: absolute; border-radius: 50%; transform: scale(0);
+        background: rgba(255,255,255,0.55); pointer-events: none;
+        animation: rippleOut 0.6s ease-out forwards;
+      }
+      @keyframes rippleOut {
+        to { transform: scale(3.2); opacity: 0; }
+      }
+      /* Terms */
+      .terms {
+        font-size: 0.75rem;
+        color: var(--muted);
+        text-align: center;
+        margin-top: 1rem;
+      }
+      .terms a {
+        color: var(--leaf-deep);
+        text-decoration: none;
+        font-weight: 600;
+      }
+      /* Alert */
+      .alert {
+        padding: 0.8rem 1rem;
+        border-radius: 8px;
+        font-size: 0.85rem;
+        margin-bottom: 1rem;
+        display: none;
+      }
+      .alert.success {
+        background: rgba(21, 128, 61, 0.12);
+        border: 1px solid rgba(21, 128, 61, 0.4);
+        color: var(--leaf-deep);
+      }
+      .alert.error {
+        background: rgba(220, 38, 38, 0.1);
+        border: 1px solid rgba(220, 38, 38, 0.35);
+        color: var(--red);
+      }
+      .alert.show {
+        display: block;
+        animation: alertSlide 0.4s cubic-bezier(.16,1,.3,1) both;
+      }
+      @keyframes alertSlide {
+        from { opacity: 0; transform: translateY(-10px); }
+        to   { opacity: 1; transform: translateY(0); }
+      }
+      /* Spinner */
+      .spinner {
+        display: inline-block;
+        width: 16px;
+        height: 16px;
+        border: 2px solid rgba(255, 255, 255, 0.35);
+        border-top-color: #fff;
+        border-radius: 50%;
+        animation: spin 0.6s linear infinite;
+        vertical-align: middle;
+        margin-right: 6px;
+      }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      /* Encryption badge */
+      .enc-badge {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        background: rgba(37, 99, 235, 0.1);
+        border: 1px solid rgba(37, 99, 235, 0.3);
+        border-radius: 8px;
+        padding: 0.6rem 0.8rem;
+        margin-bottom: 1rem;
+        font-size: 0.76rem;
+        color: var(--blue-deep);
+      }
+      @media (max-width: 480px) {
+        .form-row {
+          grid-template-columns: 1fr;
+        }
+        .role-select {
+          grid-template-columns: repeat(3, 1fr);
+        }
+      }
+      /* Crop search dropdown options (rendered by JS) */
+      .crop-option {
+        padding: 0.55rem 0.9rem;
+        font-size: 0.85rem;
+        color: var(--text-main);
+        cursor: pointer;
+        transition: background 0.15s;
+      }
+      .crop-option:hover {
+        background: rgba(21, 128, 61, 0.1);
+      }
+      @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after {
+          animation-duration: 0.001ms !important;
+          animation-iteration-count: 1 !important;
+          transition-duration: 0.001ms !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="preloader"><div class="pl-mark">Shivar</div><div class="pl-bar"></div></div>
+    <div id="cursor-dot"></div>
+    <div id="cursor-ring"></div>
+    <div id="page-grain"></div>
+    <div id="cursor-glow"></div>
+    <div class="orb orb1"></div>
+    <div class="orb orb2"></div>
+    <div class="orb orb3"></div>
+    <div class="bg"></div>
+    <div class="container">
+      <div class="logo">
+        <h1>Shiv<span>ar</span></h1>
+        <p>Eliminating Middlemen · Empowering Farmers</p>
+      </div>
+      <div class="card">
+        <!-- TABS -->
+        <div class="tabs">
+          <div id="tab-indicator"></div>
+          <div class="tab active" onclick="switchTab('login')">Login</div>
+          <div class="tab" onclick="switchTab('signup')">Register</div>
+        </div>
+
+        <div id="alert" class="alert"></div>
+
+        <!-- ══════════ LOGIN ══════════ -->
+        <div id="login-section" class="form-section active">
+          <div class="section-divider">Select Your Role</div>
+          <div class="role-select">
+            <div class="role-btn active" onclick="selectRole(this, 'farmer')">
+              <span class="role-icon">👨‍🌾</span>Farmer
+            </div>
+            <div class="role-btn" onclick="selectRole(this, 'buyer')">
+              <span class="role-icon">🏭</span>Buyer
+            </div>
+            <div class="role-btn" onclick="selectRole(this, 'logistics')">
+              <span class="role-icon">🚚</span>Logistics
+            </div>
+          </div>
+          <div class="fg">
+            <label>Mobile Number / Email</label>
+            <input
+              type="text"
+              id="login-id"
+              placeholder="+91 98765 43210 or email"
+            />
+          </div>
+          <div class="fg">
+            <label>Password</label>
+            <input
+              type="password"
+              id="login-pwd"
+              placeholder="Enter password"
+            />
+          </div>
+          <button class="submit-btn" onclick="doLogin()">
+            Login to Shivar →
+          </button>
+          <p class="terms">
+            Demo credentials — Farmer: <strong>9876543210 / farm123</strong> ·
+            Buyer: <strong>buyer@nexora.in / buy123</strong>
+          </p>
+        </div>
+
+        <!-- ══════════ SIGNUP ══════════ -->
+        <div id="signup-section" class="form-section">
+          <div class="section-divider">Select Your Role</div>
+          <div class="role-select">
+            <div
+              class="role-btn active"
+              onclick="selectSignupRole(this, 'farmer')"
+            >
+              <span class="role-icon">👨‍🌾</span>Farmer
+            </div>
+            <div class="role-btn" onclick="selectSignupRole(this, 'buyer')">
+              <span class="role-icon">🏭</span>Buyer
+            </div>
+            <div class="role-btn" onclick="selectSignupRole(this, 'logistics')">
+              <span class="role-icon">🚚</span>Logistics
+            </div>
+          </div>
+
+          <div class="enc-badge">
+            🔐 Aadhaar & sensitive fields are AES-256 encrypted. Never stored in
+            plain text.
+          </div>
+
+          <!-- BASIC INFO -->
+          <div class="section-divider">Basic Information</div>
+          <div class="form-row">
+            <div class="fg">
+              <label id="name-label">Full Name *</label
+              ><input type="text" id="s-name" placeholder="Ramesh Patil" />
+            </div>
+            <div class="fg">
+              <label id="mobile-label">Mobile Number *</label>
+              <div class="otp-row">
+                <input
+                  type="tel"
+                  id="s-mobile"
+                  placeholder="+91 98765 43210"
+                  oninput="validateMobile(this)"
+                />
+                <button class="otp-btn" onclick="sendOTP()">Send OTP</button>
+              </div>
+              <div class="hint">Indian mobile — 10 digits</div>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="fg">
+              <label>OTP *</label
+              ><input
+                type="text"
+                id="s-otp"
+                placeholder="6-digit OTP"
+                maxlength="6"
+              />
+              <div class="hint" id="otp-hint"></div>
+            </div>
+            <div class="fg">
+              <label>Email</label>
+              <input
+                type="email"
+                id="s-email"
+                placeholder="farmer@example.com"
+              />
+            </div>
+          </div>
+
+          <!-- IDENTITY VERIFICATION -->
+          <div class="section-divider" id="identity-section">
+            Identity Verification
+          </div>
+          <div class="form-row" id="identity-fields">
+            <div class="fg">
+              <label
+                >Aadhaar Number *
+                <span style="color: var(--blue); font-size: 0.7rem"
+                  >🔒 Encrypted</span
+                ></label
+              >
+              <div class="aadhaar-wrap">
+                <input
+                  type="password"
+                  id="s-aadhaar"
+                  placeholder="XXXX XXXX XXXX"
+                  maxlength="14"
+                  oninput="formatAadhaar(this)"
+                />
+                <span class="aadhaar-eye" onclick="toggleAadhaar()">👁️</span>
+              </div>
+              <div class="hint">12-digit Aadhaar — masked for security</div>
+              <div class="err-msg" id="aadhaar-err">Invalid Aadhaar format</div>
+            </div>
+            <div class="fg">
+              <label
+                >PAN Card / Farmer ID
+                <span style="color: var(--muted); font-size: 0.7rem"
+                  >(Optional)</span
+                ></label
+              >
+              <input
+                type="text"
+                id="s-pan"
+                placeholder="ABCDE1234F"
+                style="text-transform: uppercase"
+              />
+            </div>
+          </div>
+
+          <!-- FARMER SPECIFIC FIELDS -->
+          <div id="farmer-fields">
+            <div class="section-divider">Farm & Location Details</div>
+            <div class="form-row">
+              <div class="fg">
+                <label>Village *</label
+                ><input type="text" id="s-village" placeholder="e.g. Dindori" />
+              </div>
+              <div class="fg">
+                <label>Taluka *</label
+                ><input type="text" id="s-taluka" placeholder="e.g. Dindori" />
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="fg">
+                <label>District *</label
+                ><input type="text" id="s-district" placeholder="e.g. Nashik" />
+              </div>
+              <div class="fg">
+                <label>State *</label>
+                <select id="s-state">
+                  <option value="">Select State</option>
+                  <option>Maharashtra</option>
+                  <option>Punjab</option>
+                  <option>Haryana</option>
+                  <option>Uttar Pradesh</option>
+                  <option>Madhya Pradesh</option>
+                  <option>Karnataka</option>
+                  <option>Andhra Pradesh</option>
+                  <option>Tamil Nadu</option>
+                  <option>Gujarat</option>
+                  <option>Rajasthan</option>
+                  <option>West Bengal</option>
+                  <option>Bihar</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="fg">
+                <label>Land Record / Survey No. *</label
+                ><input
+                  type="text"
+                  id="s-land"
+                  placeholder="e.g. Survey No. 123/4A"
+                />
+              </div>
+              <div class="fg" style="position: relative">
+                <label>Primary Crop *</label>
+                <input
+                  type="text"
+                  id="s-crop-search"
+                  placeholder="Type to search e.g. Strawberry"
+                  autocomplete="off"
+                  oninput="filterCropList()"
+                  onfocus="showCropList()"
+                  style="
+                    width: 100%;
+                    background: rgba(255, 255, 255, 0.9);
+                    border: 1px solid var(--line);
+                    border-radius: 8px;
+                    padding: 0.6rem 0.9rem;
+                    color: var(--text-main, #17352A);
+                    font-family: &quot;DM Sans&quot;, sans-serif;
+                    font-size: 0.85rem;
+                  "
+                />
+                <input type="hidden" id="s-crop" />
+                <div
+                  id="crop-dropdown"
+                  style="
+                    display: none;
+                    position: absolute;
+                    z-index: 50;
+                    top: 100%;
+                    left: 0;
+                    right: 0;
+                    background: #ffffff;
+                    border: 1px solid rgba(21, 128, 61, 0.3);
+                    border-radius: 8px;
+                    max-height: 220px;
+                    overflow-y: auto;
+                    margin-top: 4px;
+                    box-shadow: 0 8px 24px rgba(30, 58, 138, 0.18);
+                  "
+                ></div>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="fg">
+                <label>Land Area (acres)</label
+                ><input type="number" id="s-area" placeholder="e.g. 5.5" />
+              </div>
+              <div class="fg">
+                <label>Land Ownership No.</label
+                ><input
+                  type="text"
+                  id="s-ownership"
+                  placeholder="7/12 Extract No."
+                />
+              </div>
+            </div>
+          </div>
+
+          <!-- BUYER SPECIFIC FIELDS (hidden by default) -->
+          <div id="buyer-fields" style="display: none">
+            <div class="section-divider">Company Details</div>
+            <div class="form-row">
+              <div class="fg">
+                <label>Company Name *</label
+                ><input
+                  type="text"
+                  id="s-company"
+                  placeholder="e.g. Mahindra Agro Ltd"
+                />
+              </div>
+              <div class="fg">
+                <label>GST Number</label
+                ><input type="text" id="s-gst" placeholder="22AAAAA0000A1Z5" />
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="fg">
+                <label>Industry Type *</label>
+                <select id="s-industry">
+                  <option value="">Select</option>
+                  <option>Textile / Cotton Mill</option>
+                  <option>Sugar Mill</option>
+                  <option>Food Processing</option>
+                  <option>Spice Export</option>
+                  <option>Grain Trading</option>
+                  <option>Other</option>
+                </select>
+              </div>
+              <div class="fg">
+                <label>City / District *</label
+                ><input type="text" id="s-bcity" placeholder="e.g. Pune" />
+              </div>
+            </div>
+          </div>
+
+          <!-- LOGISTICS PARTNER SPECIFIC FIELDS (hidden by default) -->
+          <div id="logistics-fields" style="display: none">
+            <div class="section-divider">Fleet & Base Location</div>
+            <div class="form-row">
+              <div class="fg">
+                <label>Base Location *</label
+                ><input
+                  type="text"
+                  id="s-base-location"
+                  placeholder="e.g. Nashik, Maharashtra"
+                />
+              </div>
+            </div>
+            <div class="fg">
+              <label>Vehicles *</label>
+              <div id="vehicleList"></div>
+              <button
+                type="button"
+                id="addVehicleBtn"
+                class="otp-btn"
+                style="margin-top: 0.4rem"
+              >
+                + Add another vehicle
+              </button>
+            </div>
+          </div>
+
+          <!-- PASSWORD -->
+          <div class="section-divider">Set Password</div>
+          <div class="form-row">
+            <div class="fg">
+              <label>Password *</label>
+              <input
+                type="password"
+                id="s-pwd"
+                placeholder="Min 8 chars"
+                oninput="checkStrength(this)"
+              />
+              <div class="pwd-strength">
+                <div class="pwd-bar" id="pb1"></div>
+                <div class="pwd-bar" id="pb2"></div>
+                <div class="pwd-bar" id="pb3"></div>
+                <div class="pwd-bar" id="pb4"></div>
+              </div>
+            </div>
+            <div class="fg">
+              <label>Confirm Password *</label
+              ><input
+                type="password"
+                id="s-cpwd"
+                placeholder="Repeat password"
+              />
+            </div>
+          </div>
+
+          <button class="submit-btn" onclick="doSignup()">
+            Create Shivar Account →
+          </button>
+          <p class="terms">
+            By registering you agree to our <a href="#">Terms</a> &
+            <a href="#">Privacy Policy</a>. Your Aadhaar is never shared.
+          </p>
+        </div>
+
+        <!-- ══════════ REAL EMAIL OTP VERIFICATION ══════════ -->
+        <div id="otp-section" class="form-section">
+          <div class="section-divider">Verify Your Email</div>
+          <div class="enc-badge">
+            📧 We emailed a 6-digit code to the address you signed up with.
+          </div>
+          <div class="fg">
+            <label>Verification Code</label>
+            <input
+              type="text"
+              id="verify-otp-input"
+              placeholder="6-digit code"
+              maxlength="6"
+            />
+          </div>
+          <button class="submit-btn" onclick="verifyEmailOtp()">
+            Verify & Continue →
+          </button>
+          <p class="terms">
+            Didn't get it?
+            <a
+              href="#"
+              onclick="
+                resendEmailOtp();
+                return false;
+              "
+              >Resend code</a
+            >
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <script src="auth-guard.js"></script>
+    <script src="api-client.js"></script>
+    <script>
+      // ── STATE ──
+      let currentRole = "farmer";
+      let signupRole = "farmer";
+      let pendingUserId = null; // set after signup or after login says "needs verification"
+
+      // ── CROP LIST (searchable dropdown) ──
+      const CROP_LIST = [
+        // Cereals
+        "Rice",
+        "Wheat",
+        "Maize",
+        "Bajra (Pearl Millet)",
+        "Jowar (Sorghum)",
+        "Ragi (Finger Millet)",
+        "Barley",
+        // Pulses
+        "Chickpea (Gram)",
+        "Pigeon Pea (Tur/Arhar)",
+        "Black Gram (Urad)",
+        "Green Gram (Moong)",
+        "Lentil (Masoor)",
+        "Kidney Beans (Rajma)",
+        "Cowpea (Lobia)",
+        "Horse Gram",
+        "Field Peas",
+        // Oilseeds
+        "Groundnut",
+        "Soybean",
+        "Sunflower",
+        "Mustard",
+        "Sesame (Til)",
+        "Castor",
+        "Safflower",
+        "Linseed",
+        "Niger Seed",
+        // Cash / Fibre crops
+        "Cotton",
+        "Sugarcane",
+        "Jute",
+        "Tobacco",
+        "Hemp",
+        "Mesta",
+        // Spices
+        "Turmeric",
+        "Chili",
+        "Black Pepper",
+        "Cardamom",
+        "Coriander",
+        "Cumin",
+        "Fennel",
+        "Fenugreek Seed",
+        "Ginger",
+        "Garlic",
+        "Clove",
+        "Cinnamon",
+        "Nutmeg",
+        "Asafoetida (Hing)",
+        "Star Anise",
+        "Vanilla",
+        // Plantation crops
+        "Tea",
+        "Coffee",
+        "Rubber",
+        "Coconut",
+        "Areca Nut",
+        "Cocoa",
+        // Fruits
+        "Mango",
+        "Banana",
+        "Grapes",
+        "Orange",
+        "Sweet Lime (Mosambi)",
+        "Pomegranate",
+        "Guava",
+        "Papaya",
+        "Apple",
+        "Pear",
+        "Peach",
+        "Plum",
+        "Litchi",
+        "Sapota (Chikoo)",
+        "Watermelon",
+        "Muskmelon",
+        "Pineapple",
+        "Strawberry",
+        "Custard Apple (Sitaphal)",
+        "Jackfruit",
+        "Fig",
+        "Dragon Fruit",
+        "Kiwi",
+        "Dates",
+        "Amla (Indian Gooseberry)",
+        "Jamun",
+        "Ber (Indian Jujube)",
+        "Lemon",
+        "Avocado",
+        // Vegetables
+        "Onion",
+        "Potato",
+        "Tomato",
+        "Brinjal (Eggplant)",
+        "Cabbage",
+        "Cauliflower",
+        "Okra (Bhindi)",
+        "Green Peas",
+        "Carrot",
+        "Radish",
+        "Beetroot",
+        "Spinach",
+        "Fenugreek Leaves (Methi)",
+        "Bottle Gourd",
+        "Bitter Gourd",
+        "Ridge Gourd",
+        "Pumpkin",
+        "Cucumber",
+        "Capsicum",
+        "Green Chili",
+        "Sweet Potato",
+        "Tapioca",
+        "French Beans",
+        "Cluster Beans (Guar)",
+        "Drumstick (Moringa)",
+        "Colocasia (Arbi)",
+        "Ash Gourd",
+        "Garlic Greens",
+        "Lettuce",
+        "Broccoli",
+        // Sugar / Others
+        "Sugar Beet",
+        "Betel Leaf (Paan)",
+        "Mushroom",
+      ];
+
+      function renderCropList(filter = "") {
+        const dd = document.getElementById("crop-dropdown");
+        const q = filter.trim().toLowerCase();
+        const matches = q
+          ? CROP_LIST.filter((c) => c.toLowerCase().includes(q))
+          : CROP_LIST;
+        dd.innerHTML = matches.length
+          ? matches
+              .map(
+                (c) =>
+                  `<div class="crop-option" onclick="selectCrop('${c.replace(/'/g, "\\'")}')">${c}</div>`,
+              )
+              .join("")
+          : '<div class="crop-option" style="color:var(--muted,#526B61);cursor:default;">No matches found</div>';
+      }
+
+      function showCropList() {
+        renderCropList(document.getElementById("s-crop-search").value);
+        document.getElementById("crop-dropdown").style.display = "block";
+      }
+
+      function filterCropList() {
+        document.getElementById("s-crop").value = ""; // clear confirmed value until a real option is picked
+        renderCropList(document.getElementById("s-crop-search").value);
+        document.getElementById("crop-dropdown").style.display = "block";
+      }
+
+      function selectCrop(c) {
+        document.getElementById("s-crop-search").value = c;
+        document.getElementById("s-crop").value = c;
+        document.getElementById("crop-dropdown").style.display = "none";
+      }
+
+      document.addEventListener("click", (e) => {
+        if (
+          !e.target.closest("#s-crop-search") &&
+          !e.target.closest("#crop-dropdown")
+        ) {
+          const dd = document.getElementById("crop-dropdown");
+          if (dd) dd.style.display = "none";
+        }
+      });
+
+      // ── LOGISTICS: VEHICLE TYPES + DYNAMIC ROWS ──
+      const VEHICLE_TYPES = [
+        ["mini_truck", "Mini Truck / Chhota Hathi"],
+        ["small_pickup", "Small Pickup"],
+        ["light_pickup", "Light Pickup / LCV"],
+        ["medium_truck", "Medium Truck"],
+        ["heavy_truck", "Heavy Truck / Multi-axle"],
+      ];
+      function vehicleRowHtml() {
+        const options = VEHICLE_TYPES.map(
+          ([val, label]) => `<option value="${val}">${label}</option>`,
+        ).join("");
+        return `
+          <div class="vehicle-row">
+            <input type="text" placeholder="Vehicle number (e.g. MH15AB1234)" class="vehicleNumber" />
+            <select class="vehicleType">${options}</select>
+            <button type="button" class="removeVehicle" title="Remove">✕</button>
+          </div>
+        `;
+      }
+      function addVehicleRow() {
+        const wrap = document.createElement("div");
+        wrap.innerHTML = vehicleRowHtml();
+        const row = wrap.firstElementChild;
+        row
+          .querySelector(".removeVehicle")
+          .addEventListener("click", () => row.remove());
+        document.getElementById("vehicleList").appendChild(row);
+      }
+      document
+        .getElementById("addVehicleBtn")
+        .addEventListener("click", addVehicleRow);
+      addVehicleRow(); // start with one row
+
+      // ── AADHAAR MASK (still handy for display; real storage never keeps the full number) ──
+      function maskAadhaar(val) {
+        const d = val.replace(/\D/g, "");
+        if (d.length <= 4) return d;
+        if (d.length <= 8) return "XXXX " + d.slice(4);
+        return "XXXX XXXX " + d.slice(8, 12);
+      }
+
+      // ── TAB SWITCH ──
+      function switchTab(tab) {
+        document
+          .querySelectorAll(".tab")
+          .forEach((t, i) =>
+            t.classList.toggle(
+              "active",
+              (tab === "login" && i === 0) || (tab === "signup" && i === 1),
+            ),
+          );
+        document
+          .getElementById("login-section")
+          .classList.toggle("active", tab === "login");
+        document
+          .getElementById("signup-section")
+          .classList.toggle("active", tab === "signup");
+      }
+
+      // ── ROLE SELECT ──
+      function selectRole(el, role) {
+        currentRole = role;
+        el.closest(".role-select")
+          .querySelectorAll(".role-btn")
+          .forEach((b) => b.classList.remove("active"));
+        el.classList.add("active");
+      }
+
+      function selectSignupRole(el, role) {
+        signupRole = role;
+        el.closest(".role-select")
+          .querySelectorAll(".role-btn")
+          .forEach((b) => b.classList.remove("active"));
+        el.classList.add("active");
+        document.getElementById("farmer-fields").style.display =
+          role === "farmer" ? "" : "none";
+        document.getElementById("buyer-fields").style.display =
+          role === "buyer" ? "" : "none";
+        document.getElementById("logistics-fields").style.display =
+          role === "logistics" ? "" : "none";
+        document.getElementById("identity-section").style.display =
+          role === "logistics" || role === "buyer" ? "none" : "";
+        document.getElementById("identity-fields").style.display =
+          role === "logistics" || role === "buyer" ? "none" : "";
+        document.getElementById("name-label").textContent =
+          role === "buyer"
+            ? "Name of Person Using This Account"
+            : role === "logistics"
+              ? "Full Name / Company Name *"
+              : "Full Name *";
+        document.getElementById("mobile-label").textContent =
+          role === "buyer" ? "Company's Mobile Number *" : "Mobile Number *";
+      }
+
+      // ── MOBILE VALIDATION ──
+      function validateMobile(input) {
+        const v = input.value.replace(/\D/g, "");
+        input.value = v;
+        input.classList.toggle(
+          "error",
+          v.length > 0 && (v.length !== 10 || !v.match(/^[6-9]/)),
+        );
+      }
+
+      // ── MOBILE CHECK BUTTON ──
+      // Real OTP is emailed automatically once the account is created below (see doSignup),
+      // since SMS delivery to Indian numbers needs DLT template registration we're skipping
+      // for the hackathon. This button just sanity-checks the mobile format up front.
+      function sendOTP() {
+        const mob = document
+          .getElementById("s-mobile")
+          .value.replace(/\D/g, "");
+        if (mob.length !== 10 || !mob.match(/^[6-9]/)) {
+          showAlert("Enter valid 10-digit Indian mobile number", "error");
+          return;
+        }
+        document.getElementById("otp-hint").textContent =
+          `Looks good. Your verification code will be emailed after you submit the form below.`;
+        showAlert(
+          `Mobile number looks valid. Fill the rest of the form and submit.`,
+          "success",
+        );
+      }
+
+      // ── AADHAAR FORMAT ──
+      function formatAadhaar(input) {
+        if (input.type === "text") {
+          let v = input.value.replace(/\D/g, "").slice(0, 12);
+          input.value = v.replace(/(\d{4})(?=\d)/g, "$1 ");
+        }
+      }
+      function toggleAadhaar() {
+        const inp = document.getElementById("s-aadhaar");
+        inp.type = inp.type === "password" ? "text" : "password";
+      }
+
+      // ── PASSWORD STRENGTH ──
+      function checkStrength(input) {
+        const v = input.value;
+        const bars = [
+          document.getElementById("pb1"),
+          document.getElementById("pb2"),
+          document.getElementById("pb3"),
+          document.getElementById("pb4"),
+        ];
+        bars.forEach((b) => (b.className = "pwd-bar"));
+        let score = 0;
+        if (v.length >= 8) score++;
+        if (/[A-Z]/.test(v)) score++;
+        if (/[0-9]/.test(v)) score++;
+        if (/[^A-Za-z0-9]/.test(v)) score++;
+        const cls = score <= 1 ? "weak" : score <= 2 ? "medium" : "strong";
+        for (let i = 0; i < score; i++) bars[i].classList.add(cls);
+      }
+
+      // ── LOGIN ── real call to POST /api/auth/login
+      async function doLogin() {
+        const id = document.getElementById("login-id").value.trim();
+        const pwd = document.getElementById("login-pwd").value;
+        const btn = document.querySelector("#login-section .submit-btn");
+
+        if (!id || !pwd) {
+          showAlert("Please fill all fields", "error");
+          return;
+        }
+
+        btn.innerHTML = '<span class="spinner"></span>Authenticating...';
+        btn.disabled = true;
+
+        try {
+          const result = await NexoraAPI.login(id, pwd);
+          AuthGuard.saveSession(result.token, result.user);
+          showAlert(
+            `✅ Welcome back, ${result.user.name}! Redirecting...`,
+            "success",
+          );
+          setTimeout(() => {
+            if (result.user.role === "farmer")
+              window.location.href = "farmer-dashboard.html";
+            else if (result.user.role === "buyer")
+              window.location.href = "buyer-dashboard.html";
+            else if (result.user.role === "logistics")
+              window.location.href = "logistics-portal.html";
+            else window.location.href = "index.html";
+          }, 1000);
+        } catch (err) {
+          if (err.data?.needsVerification) {
+            pendingUserId = err.data.userId;
+            showAlert(
+              "Your email isn't verified yet. Enter the code we sent you.",
+              "error",
+            );
+            showOtpSection();
+          } else {
+            showAlert("❌ " + (err.message || "Invalid credentials"), "error");
+          }
+          btn.innerHTML = "Login to Shivar →";
+          btn.disabled = false;
+        }
+      }
+
+      // ── SIGNUP ── real call to POST /api/auth/signup, then real email OTP verification
+      async function doSignup() {
+        const name = document.getElementById("s-name").value.trim();
+        const mobile = document
+          .getElementById("s-mobile")
+          .value.replace(/\D/g, "");
+        const email = document.getElementById("s-email").value.trim();
+        const aadhaar = document
+          .getElementById("s-aadhaar")
+          .value.replace(/\s/g, "");
+        const pwd = document.getElementById("s-pwd").value;
+        const cpwd = document.getElementById("s-cpwd").value;
+
+        if (!name || !mobile || !email || !pwd) {
+          showAlert(
+            "Please fill all required fields (name, mobile, email, password)",
+            "error",
+          );
+          return;
+        }
+        if (mobile.length !== 10) {
+          showAlert("Invalid mobile number", "error");
+          return;
+        }
+        if (
+          signupRole === "farmer" &&
+          aadhaar.replace(/\D/g, "").length !== 12
+        ) {
+          showAlert("Invalid Aadhaar — must be 12 digits", "error");
+          return;
+        }
+        if (signupRole === "logistics") {
+          const baseLoc = document
+            .getElementById("s-base-location")
+            .value.trim();
+          const anyVehicle = [
+            ...document.querySelectorAll("#vehicleList .vehicle-row"),
+          ].some((row) => row.querySelector(".vehicleNumber").value.trim());
+          if (!baseLoc) {
+            showAlert("Base location is required for logistics partners", "error");
+            return;
+          }
+          if (!anyVehicle) {
+            showAlert("Add at least one vehicle with a vehicle number", "error");
+            return;
+          }
+        }
+        if (pwd.length < 8) {
+          showAlert("Password must be at least 8 characters", "error");
+          return;
+        }
+        if (pwd !== cpwd) {
+          showAlert("Passwords do not match", "error");
+          return;
+        }
+
+        const btn = document.querySelector("#signup-section .submit-btn");
+        btn.innerHTML = '<span class="spinner"></span>Creating account...';
+        btn.disabled = true;
+
+        const payload = {
+          name,
+          mobile,
+          email,
+          password: pwd,
+          role: signupRole,
+          aadhaar,
+          panNumber: document.getElementById("s-pan")?.value || "",
+          district: document.getElementById("s-district")?.value || "N/A",
+          village: document.getElementById("s-village")?.value || "",
+          taluka: document.getElementById("s-taluka")?.value || "",
+          state: document.getElementById("s-state")?.value || "",
+          landRecord: document.getElementById("s-land")?.value || "",
+          primaryCrop: document.getElementById("s-crop")?.value || "",
+          landAreaAcres:
+            Number(document.getElementById("s-area")?.value) || undefined,
+          ownershipNo: document.getElementById("s-ownership")?.value || "",
+          companyName: document.getElementById("s-company")?.value || "",
+          gstNumber: document.getElementById("s-gst")?.value || "",
+          industryType: document.getElementById("s-industry")?.value || "",
+          baseLocation:
+            document.getElementById("s-base-location")?.value || "",
+          vehicles:
+            signupRole === "logistics"
+              ? [...document.querySelectorAll("#vehicleList .vehicle-row")]
+                  .map((row) => ({
+                    vehicleNumber: row
+                      .querySelector(".vehicleNumber")
+                      .value.trim(),
+                    vehicleType: row.querySelector(".vehicleType").value,
+                  }))
+                  .filter((v) => v.vehicleNumber)
+              : undefined,
+        };
+
+        try {
+          const result = await NexoraAPI.signup(payload);
+          pendingUserId = result.userId;
+          showAlert(
+            `✅ Account created! Check ${email} for your verification code.`,
+            "success",
+          );
+          showOtpSection();
+        } catch (err) {
+          showAlert("❌ " + (err.message || "Signup failed"), "error");
+        } finally {
+          btn.innerHTML = "Create Shivar Account →";
+          btn.disabled = false;
+        }
+      }
+
+      // ── SHOW REAL OTP VERIFICATION STEP (shared by signup and unverified-login flows) ──
+      function showOtpSection() {
+        document
+          .querySelectorAll(".form-section")
+          .forEach((s) => s.classList.remove("active"));
+        document.getElementById("otp-section").classList.add("active");
+        document
+          .querySelectorAll(".tab")
+          .forEach((t) => t.classList.remove("active"));
+      }
+
+      // ── VERIFY the real emailed OTP and log in ──
+      async function verifyEmailOtp() {
+        const otp = document.getElementById("verify-otp-input").value.trim();
+        if (!otp || otp.length !== 6) {
+          showAlert("Enter the 6-digit code from your email", "error");
+          return;
+        }
+        if (!pendingUserId) {
+          showAlert("Something went wrong — please sign up again", "error");
+          return;
+        }
+
+        const btn = document.querySelector("#otp-section .submit-btn");
+        btn.innerHTML = '<span class="spinner"></span>Verifying...';
+        btn.disabled = true;
+
+        try {
+          const result = await NexoraAPI.verifyOtp(pendingUserId, otp);
+          AuthGuard.saveSession(result.token, result.user);
+          showAlert(`✅ Verified! Redirecting...`, "success");
+          setTimeout(() => {
+            window.location.href =
+              result.user.role === "buyer"
+                ? "buyer-dashboard.html"
+                : result.user.role === "logistics"
+                  ? "logistics-portal.html"
+                  : "farmer-dashboard.html";
+          }, 1000);
+        } catch (err) {
+          showAlert("❌ " + (err.message || "Verification failed"), "error");
+          btn.innerHTML = "Verify & Continue →";
+          btn.disabled = false;
+        }
+      }
+
+      async function resendEmailOtp() {
+        if (!pendingUserId) return;
+        try {
+          await NexoraAPI.resendOtp(pendingUserId);
+          showAlert("New code sent — check your email.", "success");
+        } catch (err) {
+          showAlert("❌ " + (err.message || "Could not resend code"), "error");
+        }
+      }
+
+      function showAlert(msg, type) {
+        const el = document.getElementById("alert");
+        el.textContent = msg;
+        el.className = `alert ${type} show`;
+        setTimeout(() => el.classList.remove("show"), 5000);
+      }
+
+      // ── AUTO-REDIRECT IF ALREADY LOGGED IN ──
+      (function () {
+        const user = localStorage.getItem("nexora_user");
+        if (user) {
+          const u = JSON.parse(user);
+          // Don't auto-redirect if on auth page intentionally
+        }
+      })();
+    </script>
+
+    <!-- Purely decorative visual-effects script — no auth/business logic here -->
+    <script>
+      (function () {
+        const glowEl = document.getElementById("cursor-glow");
+        if (glowEl && window.matchMedia("(pointer:fine)").matches) {
+          document.addEventListener("mousemove", (e) => {
+            glowEl.style.left = e.clientX + "px";
+            glowEl.style.top = e.clientY + "px";
+            glowEl.style.opacity = "1";
+          });
+          document.addEventListener("mouseleave", () => (glowEl.style.opacity = "0"));
+        }
+
+        function attachRippleAndMagnet(el) {
+          if (!el || el.dataset.fxBound) return;
+          el.dataset.fxBound = "true";
+          el.addEventListener("mousemove", (e) => {
+            if (!window.matchMedia("(pointer:fine)").matches) return;
+            const r = el.getBoundingClientRect();
+            const x = e.clientX - r.left - r.width / 2;
+            const y = e.clientY - r.top - r.height / 2;
+            el.style.transform = `translate(${x * 0.06}px, ${y * 0.18}px)`;
+          });
+          el.addEventListener("mouseleave", () => {
+            el.style.transform = "";
+          });
+          el.addEventListener("click", function (e) {
+            const r = this.getBoundingClientRect();
+            const ripple = document.createElement("span");
+            ripple.className = "ripple";
+            const size = Math.max(r.width, r.height) * 1.4;
+            ripple.style.width = ripple.style.height = size + "px";
+            ripple.style.left = e.clientX - r.left - size / 2 + "px";
+            ripple.style.top = e.clientY - r.top - size / 2 + "px";
+            this.appendChild(ripple);
+            setTimeout(() => ripple.remove(), 650);
+          });
+        }
+
+        document
+          .querySelectorAll(".submit-btn, .otp-btn")
+          .forEach(attachRippleAndMagnet);
+
+        // ── Preloader ──
+        window.addEventListener("load", () => {
+          const pl = document.getElementById("preloader");
+          if (pl) setTimeout(() => pl.classList.add("done"), 300);
+        });
+
+        // ── Custom cursor (dot + lagging ring) ──
+        const cDot = document.getElementById("cursor-dot");
+        const cRing = document.getElementById("cursor-ring");
+        if (cDot && cRing && window.matchMedia("(pointer:fine)").matches) {
+          let mx = 0, my = 0, rx = 0, ry = 0;
+          document.addEventListener("mousemove", (e) => {
+            mx = e.clientX; my = e.clientY;
+            cDot.style.left = mx + "px"; cDot.style.top = my + "px";
+          });
+          (function animateRing() {
+            rx += (mx - rx) * 0.15; ry += (my - ry) * 0.15;
+            cRing.style.left = rx + "px"; cRing.style.top = ry + "px";
+            requestAnimationFrame(animateRing);
+          })();
+          document
+            .querySelectorAll("a, button, .submit-btn, .otp-btn, .tab, .role-btn, .aadhaar-eye")
+            .forEach((el) => {
+              el.addEventListener("mouseenter", () => cRing.classList.add("hover"));
+              el.addEventListener("mouseleave", () => cRing.classList.remove("hover"));
+            });
+        }
+
+        // ── Sliding tab indicator (purely visual — switchTab() still runs untouched) ──
+        const indicator = document.getElementById("tab-indicator");
+        function syncIndicator() {
+          if (!indicator) return;
+          const signupActive = document
+            .querySelector('.tab[onclick*="signup"]')
+            .classList.contains("active");
+          indicator.style.transform = signupActive ? "translateX(100%)" : "translateX(0)";
+        }
+        document.querySelectorAll(".tab").forEach((t) => {
+          t.addEventListener("click", () => setTimeout(syncIndicator, 0));
+        });
+        syncIndicator();
+
+        // ── Click burst particles on submit / OTP buttons ──
+        const BURST_EMOJI = ["🌿", "🍃", "✨", "🌾"];
+        document.querySelectorAll(".submit-btn, .otp-btn").forEach((btn) => {
+          btn.addEventListener("click", (e) => {
+            for (let i = 0; i < 7; i++) {
+              const p = document.createElement("span");
+              p.className = "burst-particle";
+              p.textContent = BURST_EMOJI[Math.floor(Math.random() * BURST_EMOJI.length)];
+              const angle = Math.random() * Math.PI * 2;
+              const dist = 35 + Math.random() * 45;
+              p.style.setProperty("--bx", Math.cos(angle) * dist + "px");
+              p.style.setProperty("--by", Math.sin(angle) * dist + "px");
+              p.style.setProperty("--br", Math.random() * 360 + "deg");
+              p.style.left = e.clientX + "px";
+              p.style.top = e.clientY + "px";
+              document.body.appendChild(p);
+              setTimeout(() => p.remove(), 900);
+            }
+          });
+        });
+      })();
+    </script>
+  </body>
+</html>

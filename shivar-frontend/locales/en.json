@@ -1,0 +1,256 @@
+{
+  "code": "en",
+  "name": "English",
+  "dir": "ltr",
+  "ui": {
+    "skip": "Skip",
+    "next": "Next",
+    "enter": "Enter Shivar",
+    "skipIntro": "Skip Intro",
+    "back": "Back"
+  },
+  "story": {
+    "slide1": {
+      "eyebrow": "The Challenge",
+      "title": "Your crop is ready. Now what?",
+      "body": "Today's market price. Where the demand is. The right buyer. The weather ahead. Government schemes. A nearby FPO. So many questions, so little time."
+    },
+    "slide2": {
+      "eyebrow": "SHIVAR",
+      "title": "Everything a farmer needs, in one place",
+      "items": [
+        "Marketplace",
+        "Market Intelligence",
+        "Climate & Weather",
+        "Smart Matching",
+        "FPO Network",
+        "Government Schemes"
+      ]
+    },
+    "slide3": {
+      "eyebrow": "Our Promise",
+      "tagline": "From your field to the right market."
+    }
+  },
+  "home": {
+    "nav": {
+      "problem": "Problem",
+      "solution": "Solution",
+      "impact": "Impact",
+      "farmer": "Farmer",
+      "buyer": "Buyer",
+      "howItWorks": "How Shivar Works",
+      "getStarted": "Get Started",
+      "langSwitch": "Language"
+    },
+    "hero": {
+      "badge": "India's First Direct Farm-to-Industry B2B Platform",
+      "titleLines": [
+        [
+          "Eliminating"
+        ],
+        [
+          "Middlemen,"
+        ],
+        [
+          "Empowering",
+          "Farmers."
+        ]
+      ],
+      "subtitle": "Shivar connects farmers directly to factories, processing industries & bulk buyers — so every rupee of profit stays where it belongs.",
+      "ctaFarmer": "I'm a Farmer →",
+      "ctaBuyer": "I'm a Buyer",
+      "price": {
+        "title": "📊 Price Reality Check — Cotton",
+        "farmerReceives": "Farmer receives",
+        "industryPays": "Industry pays",
+        "middlemenPocket": "Middlemen pocket",
+        "gapLabel": "With Shivar:",
+        "gapStrong": "Farmer gets ₹15,000"
+      }
+    },
+    "marquee": {
+      "cotton": "Cotton",
+      "wheat": "Wheat",
+      "sugarcane": "Sugarcane",
+      "soybean": "Soybean",
+      "onion": "Onion",
+      "turmeric": "Turmeric",
+      "rice": "Rice",
+      "pulses": "Pulses",
+      "zeroMiddlemen": "Zero Middlemen",
+      "transparentPricing": "100% Transparent Pricing"
+    },
+    "stats": {
+      "farmers": "Farmers in India losing to middlemen",
+      "lostPerQuintal": "Lost per quintal on average",
+      "incomeIncrease": "Potential income increase with direct access",
+      "zeroMiddlemen": "Middlemen needed on Shivar"
+    },
+    "problem": {
+      "tag": "The Problem",
+      "titleLine1": "The Invisible Loss",
+      "titleLine2": "Farmers Face Every Harvest",
+      "subtitle": "Farmers don't just struggle with nature — they struggle with a rigged market that steals their hard-earned value.",
+      "cards": [
+        {
+          "title": "Middlemen Exploitation",
+          "body": "Farmers are forced to sell at rock-bottom prices to intermediaries who flip it to industry at 2x the price."
+        },
+        {
+          "title": "No Direct Industry Access",
+          "body": "Factories, processing units & bulk buyers are unreachable for individual farmers without a network."
+        },
+        {
+          "title": "Zero Price Transparency",
+          "body": "Farmers don't know what the market actually pays. Hidden rates keep them in the dark permanently."
+        },
+        {
+          "title": "Months of Work, Minimal Return",
+          "body": "After an entire growing season, the final income doesn't reflect the labor or investment put in."
+        }
+      ],
+      "flow": {
+        "farmerBefore": {
+          "title": "Farmer",
+          "body": "Sells cotton at ₹7,000/qtl"
+        },
+        "arrow1": "Forced sale",
+        "middleman": {
+          "title": "Middleman",
+          "body": "Pockets ₹8,000 doing nothing"
+        },
+        "arrow2": "Resells at 2x",
+        "industry": {
+          "title": "Industry",
+          "body": "Pays ₹15,000/qtl to middleman"
+        },
+        "farmerAfter": {
+          "title": "Farmer on Shivar",
+          "body": "Gets full ₹15,000/qtl"
+        },
+        "arrow3": "Direct connection",
+        "buyerAfter": {
+          "title": "Industry / Buyer",
+          "body": "Buys directly, saves cost too"
+        },
+        "tags": {
+          "before": "Before",
+          "exploit": "Exploit",
+          "endBuyer": "End buyer",
+          "after": "After",
+          "winWin": "Win-Win"
+        }
+      }
+    },
+    "solution": {
+      "tag": "The Smart Solution",
+      "titleLine1": "A Direct B2B Marketplace",
+      "titleLine2": "Built for Bharat",
+      "subtitle": "One platform. Zero middlemen. Full transparency. Shivar removes the middle layer and connects farmers directly to buyers.",
+      "cards": [
+        {
+          "title": "Farmer Listings",
+          "body": "Farmers upload crop details — type, quantity, location — and set their expected price or accept competitive bids from verified buyers."
+        },
+        {
+          "title": "Industry Search & Bidding",
+          "body": "Factories and bulk buyers search by crop, region, and quantity. They contact farmers directly and place bulk orders — no phone tree, no broker."
+        },
+        {
+          "title": "Smart Matching Engine",
+          "body": "Our AI suggests the best farmer-buyer pairs based on location proximity, demand patterns, and live price trends in the market."
+        },
+        {
+          "title": "Live Price Transparency",
+          "body": "Every farmer can see what industries are actually paying today. No more guessing. No more manipulation. Just fair market data."
+        },
+        {
+          "title": "Verified B2B Trust Layer",
+          "body": "Every buyer is verified. Every transaction is tracked. Farmers deal only with legitimate factories and certified buyers."
+        },
+        {
+          "title": "Mobile-First, Low-Tech Friendly",
+          "body": "Built for rural India. Works on low-end smartphones, supports regional languages, with a UI any farmer can use in minutes."
+        },
+        {
+          "title": "AI Crop Advisory",
+          "body": "Get instant, AI-driven guidance on soil health and crop suitability. Shivar verifies soil conditions and recommends what to grow, when to sow, and how to improve yield."
+        },
+        {
+          "title": "Quality Transparency",
+          "body": "Farmers submit photos of their harvest and our AI analyzes crop quality automatically. Buyers can view the real photos themselves before placing a bid — no surprises, no disputes."
+        },
+        {
+          "title": "Live Chat, Powered by Socket.io",
+          "body": "Real-time messaging between farmers and buyers lets both sides negotiate, confirm details, and close deals instantly — direct conversation, zero delay."
+        }
+      ]
+    },
+    "impact": {
+      "tag": "Impact Analysis",
+      "titleLine1": "Real Numbers.",
+      "titleLine2": "Real Change.",
+      "subtitle": "Shivar isn't just a product — it's a financial revolution for 58 million Indian farmers.",
+      "cards": [
+        {
+          "pct": "30–80%",
+          "title": "Income Increase",
+          "body": "Direct access to buyers means farmers keep the profit that middlemen used to steal."
+        },
+        {
+          "pct": "10×",
+          "title": "Faster Selling",
+          "body": "Smart matching reduces the time from harvest to sale from weeks to hours."
+        },
+        {
+          "pct": "100%",
+          "title": "Price Transparency",
+          "body": "Every price is visible, every transaction tracked. Zero hidden cuts, ever."
+        },
+        {
+          "pct": "All",
+          "title": "Crop Industries",
+          "body": "Works for cotton, wheat, sugarcane, soybean, pulses — scalable to every crop."
+        }
+      ]
+    },
+    "analogy": {
+      "segments": [
+        {
+          "t": "10 years ago, no one imagined ",
+          "hl": false
+        },
+        {
+          "t": "Blinkit delivering groceries",
+          "hl": true
+        },
+        {
+          "t": " in 10 minutes. Today, it has reduced dependency on local intermediaries. ",
+          "hl": false
+        },
+        {
+          "t": "Shivar does the same for agriculture",
+          "hl": true
+        },
+        {
+          "t": " — connecting farmers directly to industries, the same way the internet once connected buyers directly to sellers.",
+          "hl": false
+        }
+      ],
+      "attribution": "— Shivar Vision Statement"
+    },
+    "cta": {
+      "tag": "Join the Revolution",
+      "titleLine1": "Your harvest deserves",
+      "titleLine2": "its true value.",
+      "subtitle": "Whether you grow crops or buy them at scale — Shivar is built for you.",
+      "joinFarmer": "🌾 Join as Farmer",
+      "joinBuyer": "🏭 Join as Industry Buyer"
+    },
+    "footer": {
+      "hackathon": "Shivar Business Help Tank · Hackathon 2026",
+      "tagline": "Eliminating Middlemen, Empowering Farmers."
+    }
+  }
+}

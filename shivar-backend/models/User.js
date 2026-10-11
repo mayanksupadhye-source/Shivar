@@ -1,0 +1,65 @@
+const mongoose = require('mongoose');
+
+// Sub-document: a logistics partner can register multiple vehicles
+const vehicleSchema = new mongoose.Schema({
+  vehicleNumber: { type: String, required: true, trim: true, uppercase: true },
+  vehicleType: {
+    type: String,
+    required: true,
+    enum: ['mini_truck', 'small_pickup', 'light_pickup', 'medium_truck', 'heavy_truck'],
+  },
+}, { _id: true });
+
+const userSchema = new mongoose.Schema({
+  name: { type: String, required: true, trim: true },
+  mobile: {
+    type: String,
+    required: true,
+    unique: true,
+    match: [/^[6-9]\d{9}$/, 'Enter a valid 10-digit Indian mobile number'],
+  },
+  email: {
+    type: String,
+    required: true,
+    unique: true,
+    lowercase: true,
+    trim: true,
+    match: [/^\S+@\S+\.\S+$/, 'Enter a valid email'],
+  },
+  passwordHash: { type: String, required: true },
+  role: { type: String, enum: ['farmer', 'buyer', 'logistics'], required: true },
+  district: { type: String, default: 'India' },
+
+  // Email verified via OTP before account is usable
+  isVerified: { type: Boolean, default: false },
+  otpCode: { type: String },
+  otpExpiresAt: { type: Date },
+
+  // ── Identity (never store full Aadhaar — last 4 digits only) ──
+  aadhaarLast4: { type: String },
+  panNumber: { type: String },
+
+  // ── Farmer profile fields (optional) ──
+  village: { type: String },
+  taluka: { type: String },
+  state: { type: String },
+  landRecord: { type: String },
+  primaryCrop: { type: String },
+  landAreaAcres: { type: Number },
+  ownershipNo: { type: String },
+
+  // ── Buyer profile fields (optional) ──
+  companyName: { type: String },
+  gstNumber: { type: String },
+  industryType: { type: String },
+
+  // ── Logistics Partner profile fields (optional) ──
+  // Plain text, entered once at signup, e.g. "Nashik, Maharashtra".
+  // Geocoded on-demand (see utils/geocode.js) rather than at signup time,
+  // so registration never blocks on an external API call.
+  baseLocation: { type: String, trim: true },
+  vehicles: { type: [vehicleSchema], default: undefined },
+
+}, { timestamps: true });
+
+module.exports = mongoose.model('User', userSchema);

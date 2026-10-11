@@ -1,0 +1,1715 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Shivar — Smart Matching & Price Trends</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      *,
+      *::before,
+      *::after {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      :root {
+        --earth-dark: #F0FDF4;
+        --earth-mid: #ffffff;
+        --leaf: #15803D;
+        --lime: #22C55E;
+        --gold: #FF9933;
+        --text-main: #17352A;
+        --text-muted: #526B61;
+        --blue: #2563EB;
+        --purple: #06B6D4;
+        --red: #DC2626;
+        --sidebar: 260px;
+      }
+      body {
+        font-family: "DM Sans", sans-serif;
+        background: linear-gradient(180deg, #F0FDF4 0%, #F0F9FF 50%, #F0FDF4 100%);
+        color: var(--text-main);
+        display: flex;
+        min-height: 100vh;
+      }
+
+      /* ── CUSTOM CURSOR ── */
+      @media (pointer: fine) {
+        body { cursor: none; }
+        a, button, .btn, .card, .match-card, .sidebar-nav li a { cursor: none; }
+      }
+      #cursor-dot, #cursor-ring {
+        position: fixed; top: 0; left: 0; pointer-events: none; z-index: 9999;
+        border-radius: 50%; transform: translate(-50%,-50%);
+      }
+      #cursor-dot { width: 7px; height: 7px; background: var(--leaf); opacity: 0.9; }
+      #cursor-ring {
+        width: 34px; height: 34px; border: 1.5px solid rgba(21, 128, 61,0.55);
+        transition: width 0.25s, height 0.25s, border-color 0.25s, background 0.25s;
+      }
+      #cursor-ring.hover { width: 58px; height: 58px; border-color: rgba(37, 99, 235,0.7); background: rgba(21, 128, 61,0.08); }
+      @media (max-width: 900px), (pointer: coarse) {
+        #cursor-dot, #cursor-ring { display: none !important; }
+        body, a, button { cursor: auto; }
+      }
+
+      /* ── PRELOADER ── */
+      #preloader {
+        position: fixed; inset: 0; z-index: 10000;
+        background: linear-gradient(160deg, #F0FDF4 0%, #F0F9FF 100%);
+        display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 1rem;
+        transition: opacity 0.6s ease, visibility 0.6s ease;
+      }
+      #preloader .pl-mark {
+        font-family: "Playfair Display", serif; font-size: 2.2rem; font-weight: 900;
+        background: linear-gradient(120deg, #14532D, var(--leaf) 40%, var(--blue) 70%, #14532D);
+        background-size: 300% 100%; -webkit-background-clip: text; background-clip: text; color: transparent;
+        animation: gradientSweep 1.6s ease-in-out infinite;
+      }
+      #preloader .pl-bar { width: 150px; height: 3px; border-radius: 3px; background: rgba(21, 128, 61,0.15); overflow: hidden; }
+      #preloader .pl-bar::after {
+        content: ''; display: block; height: 100%; width: 40%;
+        background: linear-gradient(90deg, var(--leaf), var(--blue));
+        animation: plLoad 1s ease-in-out infinite;
+      }
+      @keyframes plLoad { 0% { transform: translateX(-100%); } 100% { transform: translateX(350%); } }
+      #preloader.done { opacity: 0; visibility: hidden; }
+
+      /* ── GRAIN ── */
+      #page-grain {
+        position: fixed; inset: -20%; z-index: 5; pointer-events: none; opacity: 0.02; mix-blend-mode: multiply;
+        background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+        animation: grainShift 1.2s steps(4) infinite;
+      }
+      @keyframes grainShift {
+        0% { transform: translate(0,0); } 25% { transform: translate(-1%,1%); }
+        50% { transform: translate(1%,-1%); } 75% { transform: translate(-1%,-1%); } 100% { transform: translate(0,0); }
+      }
+
+      /* ── SCROLLBAR ── */
+      ::-webkit-scrollbar { width: 10px; }
+      ::-webkit-scrollbar-track { background: #F0FDF4; }
+      ::-webkit-scrollbar-thumb { background: linear-gradient(180deg, var(--leaf), var(--blue)); border-radius: 10px; }
+      html { scrollbar-color: #15803D #F0FDF4; }
+
+      /* ── ROTATING GLOW BORDER ── */
+      .glow-border { position: relative; }
+      .glow-border::after {
+        content: ''; position: absolute; inset: -1.5px; border-radius: inherit; padding: 1.5px;
+        background: conic-gradient(from 0deg, var(--leaf), var(--blue), var(--gold), var(--leaf));
+        -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+        -webkit-mask-composite: xor; mask-composite: exclude;
+        opacity: 0; transition: opacity 0.3s; pointer-events: none;
+      }
+      .glow-border:hover::after { opacity: 1; }
+      @keyframes spinBorder { to { transform: rotate(360deg); } }
+
+      /* ── CLICK BURST ── */
+      .burst-particle {
+        position: fixed; z-index: 9997; pointer-events: none; font-size: 1rem;
+        animation: burstFly 0.9s ease-out forwards;
+      }
+      @keyframes burstFly { to { transform: translate(var(--bx), var(--by)) rotate(var(--br)); opacity: 0; } }
+
+      /* ── CARD LIFT ── */
+      .card, .match-card {
+        transition: transform 0.25s ease, box-shadow 0.25s ease;
+      }
+      .match-card:hover {
+        transform: translateY(-4px);
+      }
+      @keyframes gradientSweep { 0%,100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
+
+      /* SIDEBAR */
+      .sidebar {
+        width: var(--sidebar);
+        background: var(--earth-mid);
+        border-right: 1px solid rgba(21, 128, 61, 0.2);
+        display: flex;
+        flex-direction: column;
+        padding: 2rem 0;
+        position: fixed;
+        top: 0;
+        bottom: 0;
+        left: 0;
+      }
+      .sidebar-logo {
+        font-family: "Playfair Display", serif;
+        font-size: 1.5rem;
+        font-weight: 900;
+        background: linear-gradient(120deg, #14532D, var(--leaf) 40%, var(--blue) 70%, #14532D);
+        background-size: 300% 100%;
+        -webkit-background-clip: text; background-clip: text; color: transparent;
+        animation: gradientSweep 6s ease-in-out infinite;
+        padding: 0 1.8rem 2rem;
+        border-bottom: 1px solid rgba(21, 128, 61, 0.2);
+      }
+      .sidebar-logo span {
+        background: linear-gradient(120deg, #1E3A8A, var(--blue) 60%, var(--leaf));
+        background-size: 300% 100%;
+        -webkit-background-clip: text; background-clip: text; color: transparent;
+        animation: gradientSweep 6s ease-in-out infinite;
+      }
+      .sidebar-label {
+        font-size: 0.68rem;
+        text-transform: uppercase;
+        letter-spacing: 1.5px;
+        color: var(--text-muted);
+        padding: 1.5rem 1.8rem 0.5rem;
+      }
+      .sidebar-nav {
+        list-style: none;
+        flex: 1;
+        padding: 0.5rem 0;
+      }
+      .sidebar-nav li a {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.75rem 1.8rem;
+        color: var(--text-muted);
+        text-decoration: none;
+        font-size: 0.9rem;
+        font-weight: 500;
+        transition: all 0.2s;
+        border-left: 3px solid transparent;
+      }
+      .sidebar-nav li a:hover,
+      .sidebar-nav li a.active {
+        color: var(--lime);
+        background: rgba(21, 128, 61, 0.08);
+        border-left-color: var(--lime);
+      }
+      .back-link {
+        display: block;
+        margin: 0 1.8rem 1rem;
+        color: var(--text-muted);
+        font-size: 0.82rem;
+        text-decoration: none;
+      }
+      .back-link:hover {
+        color: var(--lime);
+      }
+
+      /* MAIN */
+      .main {
+        margin-left: var(--sidebar);
+        flex: 1;
+        padding: 2.5rem;
+      }
+      .page-title {
+        font-family: "Playfair Display", serif;
+        font-size: 2rem;
+        font-weight: 900;
+        margin-bottom: 0.4rem;
+      }
+      .page-sub {
+        font-size: 0.9rem;
+        color: var(--text-muted);
+        margin-bottom: 2rem;
+      }
+      .section-title {
+        font-size: 1rem;
+        font-weight: 700;
+        margin-bottom: 1rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+      .card {
+        background: var(--earth-mid);
+        border: 1px solid rgba(21, 128, 61, 0.2);
+        border-radius: 16px;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+      }
+      .card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1.3rem;
+      }
+      .card-title {
+        font-size: 1rem;
+        font-weight: 700;
+      }
+      .badge {
+        font-size: 0.72rem;
+        font-weight: 600;
+        padding: 0.25rem 0.6rem;
+        border-radius: 4px;
+      }
+      .badge-green {
+        background: rgba(21, 128, 61, 0.2);
+        color: var(--lime);
+      }
+      .badge-gold {
+        background: rgba(255, 153, 51, 0.2);
+        color: var(--gold);
+      }
+      .badge-blue {
+        background: rgba(37, 99, 235, 0.2);
+        color: #1E3A8A;
+      }
+      .badge-purple {
+        background: rgba(6, 182, 212, 0.2);
+        color: #06B6D4;
+      }
+
+      /* MATCHING ENGINE UI */
+      .match-controls {
+        display: flex;
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+        flex-wrap: wrap;
+        align-items: flex-end;
+      }
+      .control-group {
+        display: flex;
+        flex-direction: column;
+        gap: 0.4rem;
+      }
+      .control-group label {
+        font-size: 0.78rem;
+        color: var(--text-muted);
+      }
+      .control-group select,
+      .control-group input {
+        background: rgba(220, 252, 231, 0.8);
+        border: 1px solid rgba(21, 128, 61, 0.25);
+        border-radius: 8px;
+        padding: 0.6rem 0.9rem;
+        color: var(--text-main);
+        font-family: "DM Sans", sans-serif;
+        font-size: 0.88rem;
+        min-width: 160px;
+      }
+      .control-group select:focus,
+      .control-group input:focus {
+        outline: none;
+        border-color: var(--lime);
+      }
+      .control-group select option {
+        background: var(--earth-dark);
+      }
+      .btn {
+        padding: 0.65rem 1.3rem;
+        border-radius: 8px;
+        font-size: 0.88rem;
+        font-weight: 600;
+        cursor: pointer;
+        border: none;
+        transition: all 0.2s;
+      }
+      .btn-green {
+        background: linear-gradient(135deg, var(--leaf), var(--lime));
+        color: #fff;
+      }
+      .btn-green:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 6px 20px rgba(21, 128, 61, 0.4);
+      }
+      .btn-purple {
+        background: linear-gradient(135deg, #0E7490, var(--purple));
+        color: #fff;
+      }
+      .btn-purple:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 6px 20px rgba(6, 182, 212, 0.4);
+      }
+
+      /* MATCH CARDS */
+      .matches-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 1.2rem;
+      }
+      .match-card {
+        background: rgba(220, 252, 231, 0.7);
+        border: 1px solid rgba(21, 128, 61, 0.2);
+        border-radius: 14px;
+        padding: 1.3rem;
+        position: relative;
+        overflow: hidden;
+        transition:
+          transform 0.2s,
+          border-color 0.2s,
+          box-shadow 0.2s;
+      }
+      .match-card:hover {
+        transform: translateY(-4px);
+        border-color: rgba(21, 128, 61, 0.5);
+        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3);
+      }
+      .match-score-ring {
+        position: absolute;
+        top: 1rem;
+        right: 1rem;
+        width: 52px;
+        height: 52px;
+      }
+      .ring-svg {
+        width: 100%;
+        height: 100%;
+        transform: rotate(-90deg);
+      }
+      .ring-bg {
+        fill: none;
+        stroke: rgba(21, 128, 61, 0.15);
+        stroke-width: 4;
+      }
+      .ring-fill {
+        fill: none;
+        stroke-width: 4;
+        stroke-linecap: round;
+        transition: stroke-dashoffset 1s ease;
+      }
+      .ring-label {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.7rem;
+        font-weight: 700;
+      }
+      .match-farmer {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        margin-bottom: 0.3rem;
+      }
+      .match-crop {
+        font-size: 1.05rem;
+        font-weight: 700;
+        margin-bottom: 0.6rem;
+        padding-right: 60px;
+      }
+      .match-details {
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+        margin-bottom: 1rem;
+      }
+      .match-detail {
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.82rem;
+      }
+      .match-detail .label {
+        color: var(--text-muted);
+      }
+      .match-detail .value {
+        font-weight: 600;
+      }
+      .match-tags {
+        display: flex;
+        gap: 0.4rem;
+        flex-wrap: wrap;
+        margin-bottom: 1rem;
+      }
+      .mtag {
+        font-size: 0.7rem;
+        padding: 0.15rem 0.5rem;
+        border-radius: 4px;
+        background: rgba(21, 128, 61, 0.15);
+        color: var(--lime);
+      }
+      .match-actions {
+        display: flex;
+        gap: 0.5rem;
+      }
+      .ma-btn {
+        flex: 1;
+        padding: 0.45rem;
+        border-radius: 7px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        cursor: pointer;
+        border: none;
+        text-align: center;
+      }
+      .ma-contact {
+        background: var(--leaf);
+        color: #fff;
+      }
+      .ma-view {
+        background: rgba(21, 128, 61, 0.15);
+        color: var(--lime);
+        border: 1px solid rgba(21, 128, 61, 0.3);
+      }
+
+      /* AI PULSE ANIMATION */
+      .ai-running {
+        display: none;
+        align-items: center;
+        gap: 0.8rem;
+        padding: 1rem;
+        background: rgba(6, 182, 212, 0.1);
+        border: 1px solid rgba(6, 182, 212, 0.3);
+        border-radius: 10px;
+        margin-bottom: 1.2rem;
+      }
+      .ai-running.show {
+        display: flex;
+      }
+      .ai-dots span {
+        display: inline-block;
+        width: 6px;
+        height: 6px;
+        background: var(--purple);
+        border-radius: 50%;
+        margin: 0 2px;
+        animation: blink 1.2s infinite;
+      }
+      .ai-dots span:nth-child(2) {
+        animation-delay: 0.2s;
+      }
+      .ai-dots span:nth-child(3) {
+        animation-delay: 0.4s;
+      }
+      @keyframes blink {
+        0%,
+        80%,
+        100% {
+          opacity: 0.2;
+          transform: scale(0.8);
+        }
+        40% {
+          opacity: 1;
+          transform: scale(1.2);
+        }
+      }
+
+      /* PRICE TRENDS SECTION */
+      .price-section {
+        display: grid;
+        grid-template-columns: 2fr 1fr;
+        gap: 1.5rem;
+      }
+
+      /* SVG CHART */
+      .chart-container {
+        position: relative;
+      }
+      .chart-svg {
+        width: 100%;
+        height: 200px;
+        overflow: visible;
+      }
+      .chart-legend {
+        display: flex;
+        gap: 1.5rem;
+        margin-top: 0.8rem;
+        flex-wrap: wrap;
+      }
+      .legend-item {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.8rem;
+        color: var(--text-muted);
+      }
+      .legend-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+      }
+      .chart-tabs {
+        display: flex;
+        gap: 0.5rem;
+        margin-bottom: 1.2rem;
+      }
+      .ctab {
+        padding: 0.4rem 0.9rem;
+        border-radius: 6px;
+        font-size: 0.82rem;
+        font-weight: 600;
+        cursor: pointer;
+        border: 1px solid rgba(21, 128, 61, 0.25);
+        background: transparent;
+        color: var(--text-muted);
+        transition: all 0.2s;
+      }
+      .ctab.active {
+        background: var(--leaf);
+        color: #fff;
+        border-color: var(--leaf);
+      }
+
+      /* PRICE TABLE */
+      .price-table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      .price-table th {
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 0.8px;
+        color: var(--text-muted);
+        text-align: left;
+        padding: 0.4rem 0.6rem;
+        border-bottom: 1px solid rgba(30, 58, 138, 0.06);
+      }
+      .price-table td {
+        padding: 0.75rem 0.6rem;
+        border-bottom: 1px solid rgba(30, 58, 138, 0.04);
+        font-size: 0.88rem;
+      }
+      .price-table tr:last-child td {
+        border-bottom: none;
+      }
+      .trend-up {
+        color: var(--lime);
+      }
+      .trend-down {
+        color: var(--red);
+      }
+      .trend-arrow {
+        font-size: 0.8rem;
+      }
+
+      /* DEMAND HEATMAP */
+      .heatmap-grid {
+        display: grid;
+        grid-template-columns: repeat(6, 1fr);
+        gap: 6px;
+      }
+      .hmap-cell {
+        border-radius: 6px;
+        padding: 0.7rem 0.3rem;
+        text-align: center;
+        font-size: 0.72rem;
+        transition: transform 0.2s;
+        cursor: pointer;
+      }
+      .hmap-cell:hover {
+        transform: scale(1.08);
+      }
+      .hmap-label {
+        font-weight: 600;
+        margin-bottom: 2px;
+      }
+      .hmap-val {
+        font-size: 0.65rem;
+        color: rgba(30, 58, 138, 0.7);
+      }
+      .h1 {
+        background: rgba(21, 128, 61, 0.9);
+      }
+      .h2 {
+        background: rgba(21, 128, 61, 0.7);
+      }
+      .h3 {
+        background: rgba(21, 128, 61, 0.5);
+      }
+      .h4 {
+        background: rgba(21, 128, 61, 0.3);
+      }
+      .h5 {
+        background: rgba(21, 128, 61, 0.15);
+      }
+
+      /* PREDICTION CARD */
+      .prediction-card {
+        background: linear-gradient(
+          135deg,
+          rgba(6, 182, 212, 0.15),
+          rgba(37, 99, 235, 0.1)
+        );
+        border: 1px solid rgba(6, 182, 212, 0.3);
+        border-radius: 14px;
+        padding: 1.3rem;
+      }
+      .pred-icon {
+        font-size: 2rem;
+        margin-bottom: 0.5rem;
+      }
+      .pred-crop {
+        font-size: 0.78rem;
+        color: var(--text-muted);
+      }
+      .pred-price {
+        font-family: "Playfair Display", serif;
+        font-size: 2rem;
+        font-weight: 900;
+        color: var(--lime);
+      }
+      .pred-label {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+      }
+      .pred-confidence {
+        margin-top: 0.8rem;
+      }
+      .pred-conf-label {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        margin-bottom: 0.3rem;
+      }
+      .conf-bar-wrap {
+        background: rgba(30, 58, 138, 0.08);
+        border-radius: 4px;
+        height: 6px;
+      }
+      .conf-bar-fill {
+        height: 6px;
+        border-radius: 4px;
+        background: linear-gradient(90deg, var(--leaf), var(--lime));
+      }
+
+      /* TOAST */
+      .toast {
+        position: fixed;
+        bottom: 2rem;
+        right: 2rem;
+        background: var(--earth-mid);
+        border: 1px solid rgba(6, 182, 212, 0.4);
+        border-radius: 12px;
+        padding: 1rem 1.3rem;
+        font-size: 0.88rem;
+        transform: translateY(100px);
+        opacity: 0;
+        transition: all 0.4s;
+        z-index: 999;
+        display: flex;
+        align-items: center;
+        gap: 0.7rem;
+      }
+      .toast.show {
+        transform: translateY(0);
+        opacity: 1;
+      }
+
+      @media (max-width: 900px) {
+        .sidebar {
+          display: none;
+        }
+        .main {
+          margin-left: 0;
+          padding: 1.5rem;
+        }
+        .price-section {
+          grid-template-columns: 1fr;
+        }
+        .matches-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="preloader"><div class="pl-mark">Shivar</div><div class="pl-bar"></div></div>
+    <div id="cursor-dot"></div>
+    <div id="cursor-ring"></div>
+    <div id="page-grain"></div>
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+      <div class="sidebar-logo">Shiv<span>ar</span></div>
+      <div class="sidebar-label">Intelligence</div>
+      <ul class="sidebar-nav">
+        <li><a href="farmer-dashboard.html">🌾 Farmer Dashboard</a></li>
+        <li><a href="buyer-dashboard.html">🏭 Buyer Dashboard</a></li>
+        <li><a href="#matching" class="active">🤖 Smart Matching</a></li>
+        <li><a href="#trends">📈 Price Trends</a></li>
+        <li><a href="#demand">🌡️ Demand Heatmap</a></li>
+        <li><a href="#predict">🔮 Price Forecast</a></li>
+      </ul>
+      <a href="index.html" class="back-link">← Back to Home</a>
+    </aside>
+
+    <!-- MAIN -->
+    <main class="main">
+      <h1 class="page-title">🤖 Smart Matching & Price Intelligence</h1>
+      <p class="page-sub">
+        AI-powered farmer-buyer pairing + live market data so every deal is
+        fair, fast, and transparent.
+      </p>
+
+      <!-- MATCHING ENGINE -->
+      <div class="card glow-border" id="matching">
+        <div class="card-header">
+          <span class="card-title">🤖 Smart Matching Engine</span>
+          <span class="badge badge-purple">AI-Powered</span>
+        </div>
+        <div class="match-controls">
+         
+          <div class="control-group" style="position:relative;">
+            <label>Crop Type</label>
+            <input type="text" id="sm-crop-search" placeholder="Type to search e.g. Cotton" autocomplete="off"
+                   oninput="filterSMCropList()" onfocus="showSMCropList()"
+                   style="width:100%;background:rgba(220, 252, 231,0.8);border:1px solid rgba(21, 128, 61,0.25);border-radius:8px;padding:0.6rem 0.9rem;color:#17352A;font-size:0.85rem;"/>
+            <input type="hidden" id="match-crop" value="Cotton"/>
+            <div id="sm-crop-dropdown" style="display:none;position:absolute;z-index:50;top:100%;left:0;right:0;background:#ffffff;border:1px solid rgba(21, 128, 61,0.35);border-radius:8px;max-height:220px;overflow-y:auto;margin-top:4px;box-shadow:0 8px 24px rgba(0,0,0,0.4);"></div>
+          </div>
+          <div class="control-group" style="position:relative;">
+            <label>District</label>
+            <input type="text" id="sm-district-search" placeholder="Type to search e.g. Latur" autocomplete="off"
+                   oninput="filterSMDistrictList()" onfocus="showSMDistrictList()"
+                   style="width:100%;background:rgba(220, 252, 231,0.8);border:1px solid rgba(21, 128, 61,0.25);border-radius:8px;padding:0.6rem 0.9rem;color:#17352A;font-size:0.85rem;"/>
+            <input type="hidden" id="match-district" value="All Districts"/>
+            <div id="sm-district-dropdown" style="display:none;position:absolute;z-index:50;top:100%;left:0;right:0;background:#ffffff;border:1px solid rgba(21, 128, 61,0.35);border-radius:8px;max-height:220px;overflow-y:auto;margin-top:4px;box-shadow:0 8px 24px rgba(0,0,0,0.4);"></div>
+          </div>
+
+          <div class="control-group">
+            <label>Min Quantity (qtl)</label>
+            <input type="number" id="sm-min-qty" placeholder="50" min="0"
+                   style="width:100%;background:rgba(220, 252, 231,0.8);border:1px solid rgba(21, 128, 61,0.25);border-radius:8px;padding:0.6rem 0.9rem;color:#17352A;font-size:0.85rem;" />
+          </div>
+          <div class="control-group">
+            <label>Max Price (₹/qtl)</label>
+            <input type="number" id="sm-max-price" placeholder="8800" min="0"
+                   style="width:100%;background:rgba(220, 252, 231,0.8);border:1px solid rgba(21, 128, 61,0.25);border-radius:8px;padding:0.6rem 0.9rem;color:#17352A;font-size:0.85rem;" />
+          </div>
+          <div class="control-group">
+            <label>Required By</label>
+            <input type="date" id="sm-required-by"
+                   style="width:100%;background:rgba(220, 252, 231,0.8);border:1px solid rgba(21, 128, 61,0.25);border-radius:8px;padding:0.6rem 0.9rem;color:#17352A;font-size:0.85rem;" />
+          </div>
+          <div class="control-group">
+            <label>Match Priority</label>
+            <select>
+              <option>Best Price</option>
+              <option>Closest Location</option>
+              <option>Highest Demand</option>
+              <option>Fastest Deal</option>
+            </select>
+          </div>
+          <button class="btn btn-purple" onclick="runMatching()">
+            ⚡ Run AI Match
+          </button>
+        </div>
+
+        <!-- AI PULSE -->
+        <div class="ai-running" id="ai-pulse">
+          <div class="ai-dots"><span></span><span></span><span></span></div>
+          <span style="font-size: 0.88rem; color: #06B6D4"
+            >AI is analyzing 42 listings against 18 buyer demands across 6
+            regions...</span
+          >
+        </div>
+
+        <!-- MATCH RESULTS -->
+        <div class="matches-grid" id="matches-grid">
+          <!-- Cards injected by JS -->
+        </div>
+      </div>
+
+      <!-- PRICE TRENDS -->
+      <div id="trends">
+        <div
+          style="
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+          "
+        >
+          <div>
+            <h2
+              style="
+                font-family: &quot;Playfair Display&quot;, serif;
+                font-size: 1.5rem;
+                font-weight: 900;
+              "
+            >
+              📈 Live Price Trends
+            </h2>
+            <p style="font-size: 0.85rem; color: var(--text-muted)">
+              Market prices updated daily. No middleman distortion.
+            </p>
+          </div>
+        </div>
+        <div class="price-section">
+          <!-- CHART -->
+          <div class="card glow-border">
+            <div class="card-header">
+              <span class="card-title">Price Movement</span>
+              <span class="badge badge-gold">Live</span>
+            </div>
+            <div class="chart-tabs">
+              <button class="ctab active" onclick="setTab(this, 'cotton')">
+                Cotton
+              </button>
+              <button class="ctab" onclick="setTab(this, 'wheat')">
+                Wheat
+              </button>
+              <button class="ctab" onclick="setTab(this, 'soybean')">
+                Soybean
+              </button>
+              <button class="ctab" onclick="setTab(this, 'turmeric')">
+                Turmeric
+              </button>
+            </div>
+            <div class="chart-container">
+              <svg
+                class="chart-svg"
+                id="price-chart"
+                viewBox="0 0 600 180"
+                preserveAspectRatio="none"
+              >
+                <defs>
+                  <linearGradient id="lineGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stop-color="#22C55E" stop-opacity="0.3" />
+                    <stop offset="100%" stop-color="#22C55E" stop-opacity="0" />
+                  </linearGradient>
+                </defs>
+                <!-- Grid lines -->
+                <line
+                  x1="0"
+                  y1="36"
+                  x2="600"
+                  y2="36"
+                  stroke="rgba(30, 58, 138,0.14)"
+                  stroke-width="1"
+                />
+                <line
+                  x1="0"
+                  y1="72"
+                  x2="600"
+                  y2="72"
+                  stroke="rgba(30, 58, 138,0.14)"
+                  stroke-width="1"
+                />
+                <line
+                  x1="0"
+                  y1="108"
+                  x2="600"
+                  y2="108"
+                  stroke="rgba(30, 58, 138,0.14)"
+                  stroke-width="1"
+                />
+                <line
+                  x1="0"
+                  y1="144"
+                  x2="600"
+                  y2="144"
+                  stroke="rgba(30, 58, 138,0.14)"
+                  stroke-width="1"
+                />
+                <!-- Area fill -->
+                <path id="area-path" fill="url(#lineGrad)" />
+                <path
+                  id="red-line"
+                  fill="none"
+                  stroke="#DC2626"
+                  stroke-width="2"
+                  stroke-dasharray="6,4"
+                />
+                <!-- Line -->
+                <path
+                  id="line-path"
+                  fill="none"
+                  stroke="#22C55E"
+                  stroke-width="2.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+                <!-- Dots -->
+                <g id="chart-dots"></g>
+                <!-- X labels -->
+                <g
+                  id="chart-xlabels"
+                  font-size="9"
+                  fill="#526B61"
+                  text-anchor="middle"
+                ></g>
+              </svg>
+            </div>
+            <div class="chart-legend">
+              <div class="legend-item">
+                <div class="legend-dot" style="background: var(--lime)"></div>
+                Industry Price (Actual)
+              </div>
+              <div class="legend-item">
+                <div class="legend-dot" style="background: var(--red)"></div>
+                Farmer Received (Before Shivar)
+              </div>
+            </div>
+          </div>
+
+          <!-- PRICE TABLE -->
+          <div class="card glow-border">
+            <div class="card-header">
+              <span class="card-title">Today's Prices</span>
+              <span class="badge badge-green">Apr 9</span>
+            </div>
+            <table class="price-table">
+              <thead>
+                <tr>
+                  <th>Crop</th>
+                  <th>Price</th>
+                  <th>Trend</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>🌿 Cotton</td>
+                  <td style="color: var(--gold); font-weight: 700">₹15,200</td>
+                  <td class="trend-up">↑ +4.2%</td>
+                </tr>
+                <tr>
+                  <td>🌾 Wheat</td>
+                  <td style="color: var(--gold); font-weight: 700">₹2,820</td>
+                  <td class="trend-up">↑ +1.8%</td>
+                </tr>
+                <tr>
+                  <td>🎋 Sugarcane</td>
+                  <td style="color: var(--gold); font-weight: 700">₹3,480</td>
+                  <td class="trend-up">↑ +2.1%</td>
+                </tr>
+                <tr>
+                  <td>🫘 Soybean</td>
+                  <td style="color: var(--gold); font-weight: 700">₹5,100</td>
+                  <td class="trend-down">↓ -0.9%</td>
+                </tr>
+                <tr>
+                  <td>🟡 Turmeric</td>
+                  <td style="color: var(--gold); font-weight: 700">₹11,800</td>
+                  <td class="trend-up">↑ +3.5%</td>
+                </tr>
+                <tr>
+                  <td>🌰 Pulses</td>
+                  <td style="color: var(--gold); font-weight: 700">₹7,200</td>
+                  <td class="trend-up">↑ +0.6%</td>
+                </tr>
+              </tbody>
+            </table>
+            <div
+              style="
+                margin-top: 1rem;
+                padding: 0.8rem;
+                background: rgba(21, 128, 61, 0.1);
+                border-radius: 8px;
+                font-size: 0.78rem;
+                color: var(--lime);
+              "
+            >
+              💡 These are <strong>industry-direct prices</strong>. No
+              middlemen. Compare to local mandi and see the difference.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- DEMAND HEATMAP -->
+      <div class="card glow-border" id="demand">
+        <div class="card-header">
+          <span class="card-title">🌡️ Demand Heatmap — Maharashtra</span>
+          <span class="badge badge-blue">By District</span>
+        </div>
+        <div class="heatmap-grid">
+          <div class="hmap-cell h1">
+            <div class="hmap-label">Nashik</div>
+            <div class="hmap-val">Cotton 🔥🔥🔥</div>
+          </div>
+          <div class="hmap-cell h1">
+            <div class="hmap-label">Pune</div>
+            <div class="hmap-val">Wheat 🔥🔥🔥</div>
+          </div>
+          <div class="hmap-cell h2">
+            <div class="hmap-label">Nagpur</div>
+            <div class="hmap-val">Cotton 🔥🔥</div>
+          </div>
+          <div class="hmap-cell h2">
+            <div class="hmap-label">Kolhapur</div>
+            <div class="hmap-val">Sugarcane 🔥🔥</div>
+          </div>
+          <div class="hmap-cell h3">
+            <div class="hmap-label">Latur</div>
+            <div class="hmap-val">Soybean 🔥</div>
+          </div>
+          <div class="hmap-cell h3">
+            <div class="hmap-label">Sangli</div>
+            <div class="hmap-val">Turmeric 🔥</div>
+          </div>
+          <div class="hmap-cell h2">
+            <div class="hmap-label">Aurangabad</div>
+            <div class="hmap-val">Wheat 🔥🔥</div>
+          </div>
+          <div class="hmap-cell h4">
+            <div class="hmap-label">Solapur</div>
+            <div class="hmap-val">Pulses</div>
+          </div>
+          <div class="hmap-cell h1">
+            <div class="hmap-label">Yavatmal</div>
+            <div class="hmap-val">Cotton 🔥🔥🔥</div>
+          </div>
+          <div class="hmap-cell h3">
+            <div class="hmap-label">Nanded</div>
+            <div class="hmap-val">Soybean 🔥</div>
+          </div>
+          <div class="hmap-cell h4">
+            <div class="hmap-label">Ahmednagar</div>
+            <div class="hmap-val">Onion</div>
+          </div>
+          <div class="hmap-cell h5">
+            <div class="hmap-label">Ratnagiri</div>
+            <div class="hmap-val">Mango</div>
+          </div>
+        </div>
+        <p
+          style="font-size: 0.78rem; color: var(--text-muted); margin-top: 1rem"
+        >
+          🔥 intensity indicates current buyer demand. Darker = more buyers
+          actively seeking supply from that region.
+        </p>
+      </div>
+
+      <!-- PRICE PREDICTION -->
+      <div class="card glow-border" id="predict">
+        <div class="card-header">
+          <span class="card-title">🔮 AI Price Forecast — Next 30 Days</span>
+          <span class="badge badge-purple">Beta Feature</span>
+        </div>
+        <div
+          style="
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 1rem;
+          "
+        >
+          <div class="prediction-card">
+            <div class="pred-icon">🌿</div>
+            <div class="pred-crop">Cotton · Nashik Region</div>
+            <div class="pred-price">₹15,800</div>
+            <div class="pred-label">Forecast for May 2025</div>
+            <div class="pred-confidence">
+              <div class="pred-conf-label">Confidence: 84%</div>
+              <div class="conf-bar-wrap">
+                <div class="conf-bar-fill" style="width: 84%"></div>
+              </div>
+            </div>
+            <p
+              style="font-size: 0.75rem; color: var(--lime); margin-top: 0.6rem"
+            >
+              ↑ Good time to list now & lock in orders
+            </p>
+          </div>
+          <div class="prediction-card">
+            <div class="pred-icon">🌾</div>
+            <div class="pred-crop">Wheat · Aurangabad</div>
+            <div class="pred-price">₹2,950</div>
+            <div class="pred-label">Forecast for May 2025</div>
+            <div class="pred-confidence">
+              <div class="pred-conf-label">Confidence: 77%</div>
+              <div class="conf-bar-wrap">
+                <div class="conf-bar-fill" style="width: 77%"></div>
+              </div>
+            </div>
+            <p
+              style="font-size: 0.75rem; color: var(--lime); margin-top: 0.6rem"
+            >
+              ↑ Slight uptick — hold if possible
+            </p>
+          </div>
+          <div class="prediction-card">
+            <div class="pred-icon">🫘</div>
+            <div class="pred-crop">Soybean · Latur</div>
+            <div class="pred-price">₹4,850</div>
+            <div class="pred-label">Forecast for May 2025</div>
+            <div class="pred-confidence">
+              <div class="pred-conf-label">Confidence: 71%</div>
+              <div class="conf-bar-wrap">
+                <div
+                  class="conf-bar-fill"
+                  style="
+                    width: 71%;
+                    background: linear-gradient(90deg, var(--red), #F59E0B);
+                  "
+                ></div>
+              </div>
+            </div>
+            <p
+              style="font-size: 0.75rem; color: var(--red); margin-top: 0.6rem"
+            >
+              ↓ Sell now — dip expected in May
+            </p>
+          </div>
+          <div class="prediction-card">
+            <div class="pred-icon">🟡</div>
+            <div class="pred-crop">Turmeric · Sangli</div>
+            <div class="pred-price">₹13,200</div>
+            <div class="pred-label">Forecast for May 2025</div>
+            <div class="pred-confidence">
+              <div class="pred-conf-label">Confidence: 89%</div>
+              <div class="conf-bar-wrap">
+                <div class="conf-bar-fill" style="width: 89%"></div>
+              </div>
+            </div>
+            <p
+              style="font-size: 0.75rem; color: var(--lime); margin-top: 0.6rem"
+            >
+              ↑ Strong uptrend — high demand ahead
+            </p>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- TOAST -->
+    <div class="toast" id="toast">
+      <span>🤖</span><span id="toast-msg">Processing...</span>
+    </div>
+
+    <script>
+      // Match data
+
+      function renderMatches(data) {
+        const grid = document.getElementById("matches-grid");
+        grid.innerHTML = data
+          .map((m) => {
+            const r = 22;
+            const circ = 2 * Math.PI * r;
+            const fill = circ - (m.score / 100) * circ;
+            return `
+    <div class="match-card">
+      <div class="match-score-ring">
+        <svg class="ring-svg" viewBox="0 0 52 52">
+          <circle class="ring-bg" cx="26" cy="26" r="${r}"/>
+          <circle class="ring-fill" cx="26" cy="26" r="${r}" stroke="${m.color}"
+            stroke-dasharray="${circ}" stroke-dashoffset="${fill}"/>
+        </svg>
+        <div class="ring-label" style="color:${m.color}">${m.score}%</div>
+      </div>
+      <div class="match-farmer">👨‍🌾 ${m.farmer}</div>
+      <div class="match-crop">${m.crop}</div>
+      <div class="match-details">
+        <div class="match-detail"><span class="label">📍 Location</span><span class="value">${m.loc}</span></div>
+        <div class="match-detail"><span class="label">📦 Quantity</span><span class="value">${m.qty}</span></div>
+        <div class="match-detail"><span class="label">💰 Price</span><span class="value" style="color:var(--gold)">${m.price}</span></div>
+      </div>
+      <div class="match-tags">${m.tags.map((t) => `<span class="mtag">${t}</span>`).join("")}</div>
+      <div class="match-actions">
+        <button class="ma-btn ma-contact" onclick="showToast('💬 Connecting you with ${m.farmer}...')">Connect Now</button>
+        <button class="ma-btn ma-view" onclick="showToast('📋 Opening full details for ${m.crop}')">Details</button>
+      </div>
+    </div>`;
+          })
+          .join("");
+      }
+
+      // ── CROP LIST (searchable dropdown) — Smart Matching filter ──
+      const SM_CROP_LIST = [
+        "Rice",
+        "Wheat",
+        "Maize",
+        "Bajra (Pearl Millet)",
+        "Jowar (Sorghum)",
+        "Ragi (Finger Millet)",
+        "Barley",
+        "Chickpea (Gram)",
+        "Pigeon Pea (Tur/Arhar)",
+        "Black Gram (Urad)",
+        "Green Gram (Moong)",
+        "Lentil (Masoor)",
+        "Kidney Beans (Rajma)",
+        "Cowpea (Lobia)",
+        "Horse Gram",
+        "Field Peas",
+        "Groundnut",
+        "Soybean",
+        "Sunflower",
+        "Mustard",
+        "Sesame (Til)",
+        "Castor",
+        "Safflower",
+        "Linseed",
+        "Niger Seed",
+        "Cotton",
+        "Sugarcane",
+        "Jute",
+        "Tobacco",
+        "Hemp",
+        "Mesta",
+        "Turmeric",
+        "Chili",
+        "Black Pepper",
+        "Cardamom",
+        "Coriander",
+        "Cumin",
+        "Fennel",
+        "Fenugreek Seed",
+        "Ginger",
+        "Garlic",
+        "Clove",
+        "Cinnamon",
+        "Nutmeg",
+        "Asafoetida (Hing)",
+        "Star Anise",
+        "Vanilla",
+        "Tea",
+        "Coffee",
+        "Rubber",
+        "Coconut",
+        "Areca Nut",
+        "Cocoa",
+        "Mango",
+        "Banana",
+        "Grapes",
+        "Orange",
+        "Sweet Lime (Mosambi)",
+        "Pomegranate",
+        "Guava",
+        "Papaya",
+        "Apple",
+        "Pear",
+        "Peach",
+        "Plum",
+        "Litchi",
+        "Sapota (Chikoo)",
+        "Watermelon",
+        "Muskmelon",
+        "Pineapple",
+        "Strawberry",
+        "Custard Apple (Sitaphal)",
+        "Jackfruit",
+        "Fig",
+        "Dragon Fruit",
+        "Kiwi",
+        "Dates",
+        "Amla (Indian Gooseberry)",
+        "Jamun",
+        "Ber (Indian Jujube)",
+        "Lemon",
+        "Avocado",
+        "Onion",
+        "Potato",
+        "Tomato",
+        "Brinjal (Eggplant)",
+        "Cabbage",
+        "Cauliflower",
+        "Okra (Bhindi)",
+        "Green Peas",
+        "Carrot",
+        "Radish",
+        "Beetroot",
+        "Spinach",
+        "Fenugreek Leaves (Methi)",
+        "Bottle Gourd",
+        "Bitter Gourd",
+        "Ridge Gourd",
+        "Pumpkin",
+        "Cucumber",
+        "Capsicum",
+        "Green Chili",
+        "Sweet Potato",
+        "Tapioca",
+        "French Beans",
+        "Cluster Beans (Guar)",
+        "Drumstick (Moringa)",
+        "Colocasia (Arbi)",
+        "Ash Gourd",
+        "Garlic Greens",
+        "Lettuce",
+        "Broccoli",
+        "Sugar Beet",
+        "Betel Leaf (Paan)",
+        "Mushroom",
+      ];
+
+      // ── DISTRICTS — exact strings as they actually appear in your seeded MongoDB data ──
+      const SM_DISTRICT_LIST = [
+        "Ahilyanagar (Ahmednagar)",
+        "Akola",
+        "Amravati",
+        "Beed",
+        "Bhandara",
+        "Buldhana",
+        "Chandrapur",
+        "Chhatrapati Sambhajinagar (Aurangabad)",
+        "Dharashiv (Osmanabad)",
+        "Dhule",
+        "Gadchiroli",
+        "Gondia",
+        "Hingoli",
+        "Jalgaon",
+        "Jalna",
+        "Kolhapur",
+        "Latur",
+        "Mumbai City",
+        "Mumbai Suburban",
+        "Nagpur",
+        "Nanded",
+        "Nandurbar",
+        "Nashik",
+        "Palghar",
+        "Parbhani",
+        "Pune",
+        "Raigad",
+        "Ratnagiri",
+        "Sangli",
+        "Satara",
+        "Sindhudurg",
+        "Solapur",
+        "Thane",
+        "Wardha",
+        "Washim",
+        "Yavatmal",
+      ];
+
+      function renderSMCropList(filter = "") {
+        const dd = document.getElementById("sm-crop-dropdown");
+        const q = filter.trim().toLowerCase();
+        const matches = q
+          ? SM_CROP_LIST.filter((c) => c.toLowerCase().includes(q))
+          : SM_CROP_LIST;
+        dd.innerHTML = matches.length
+          ? matches
+              .map(
+                (c) =>
+                  `<div class="crop-option" onclick="selectSMCrop('${c.replace(/'/g, "\\'")}')">${c}</div>`,
+              )
+              .join("")
+          : '<div class="crop-option" style="color:var(--muted,#526B61);cursor:default;">No matches found</div>';
+      }
+      function showSMCropList() {
+        renderSMCropList(document.getElementById("sm-crop-search").value);
+        document.getElementById("sm-crop-dropdown").style.display = "block";
+      }
+      function filterSMCropList() {
+        renderSMCropList(document.getElementById("sm-crop-search").value);
+        document.getElementById("sm-crop-dropdown").style.display = "block";
+      }
+      function selectSMCrop(c) {
+        document.getElementById("sm-crop-search").value = c;
+        document.getElementById("match-crop").value = c;
+        document.getElementById("sm-crop-dropdown").style.display = "none";
+      }
+
+      function renderSMDistrictList(filter = "") {
+        const dd = document.getElementById("sm-district-dropdown");
+        const q = filter.trim().toLowerCase();
+        const all = ["All Districts", ...SM_DISTRICT_LIST];
+        const matches = q
+          ? all.filter((c) => c.toLowerCase().includes(q))
+          : all;
+        dd.innerHTML = matches.length
+          ? matches
+              .map(
+                (c) =>
+                  `<div class="crop-option" onclick="selectSMDistrict('${c.replace(/'/g, "\\'")}')">${c}</div>`,
+              )
+              .join("")
+          : '<div class="crop-option" style="color:var(--muted,#526B61);cursor:default;">No matches found</div>';
+      }
+      function showSMDistrictList() {
+        renderSMDistrictList(
+          document.getElementById("sm-district-search").value,
+        );
+        document.getElementById("sm-district-dropdown").style.display = "block";
+      }
+      function filterSMDistrictList() {
+        renderSMDistrictList(
+          document.getElementById("sm-district-search").value,
+        );
+        document.getElementById("sm-district-dropdown").style.display = "block";
+      }
+      function selectSMDistrict(c) {
+        document.getElementById("sm-district-search").value = c;
+        document.getElementById("match-district").value = c;
+        document.getElementById("sm-district-dropdown").style.display = "none";
+      }
+
+      document.addEventListener("click", (e) => {
+        if (
+          !e.target.closest("#sm-crop-search") &&
+          !e.target.closest("#sm-crop-dropdown")
+        ) {
+          const dd = document.getElementById("sm-crop-dropdown");
+          if (dd) dd.style.display = "none";
+        }
+        if (
+          !e.target.closest("#sm-district-search") &&
+          !e.target.closest("#sm-district-dropdown")
+        ) {
+          const dd = document.getElementById("sm-district-dropdown");
+          if (dd) dd.style.display = "none";
+        }
+      });
+
+      
+      // ── REAL SMART MATCHING (rule-based scoring against live MongoDB listings) ──
+      async function runMatching() {
+        const pulse = document.getElementById("ai-pulse");
+        const grid = document.getElementById("matches-grid");
+        pulse.classList.add("show");
+        grid.innerHTML = "";
+
+        // Read the buyer's actual filter choices from the form
+        const cropSel = document.getElementById("match-crop").value;
+        const regionSel = document.getElementById("match-district").value;
+        const minQtyQtl =
+          parseFloat(document.getElementById("sm-min-qty").value) || 0;
+        const maxPrice =
+          parseFloat(document.getElementById("sm-max-price").value) || 999999; // no ceiling if left blank
+        const requiredBy =
+          document.getElementById("sm-required-by").value ||
+          new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10); // default: 30 days out
+        const priority = document.querySelectorAll(".control-group select")[0]
+          .value; // Best Price / Closest Location / Highest Demand / Fastest Deal
+
+        // 🔌 Calls the real trained model (Node → FastAPI ml-model → back).
+        // qtl → tons: the model's required_quantity_tons expects tons (1 ton = 10 qtl).
+        const payload = {
+          crop: cropSel && cropSel !== "All Crops" ? cropSel : "",
+          variety: "Not Specified",
+          required_quantity_tons: minQtyQtl / 10,
+          maximum_price_per_quintal: maxPrice,
+          required_by_date: requiredBy,
+          cluster: "",
+          district: regionSel && regionSel !== "All Districts" ? regionSel : "",
+          taluka: "",
+          village: "",
+          top_k: 20,
+        };
+
+        try {
+          const data = await NexoraAPI.smartMatchBuyerToFarmer(payload);
+          let results = data.results || [];
+
+          // "Match Priority" re-sorts the model's already-ranked results —
+          // the model itself always returns one blended compatibility_score.
+          if (priority === "Best Price") {
+            results = [...results].sort(
+              (a, b) => a.price_per_quintal - b.price_per_quintal,
+            );
+          } else if (priority === "Fastest Deal") {
+            results = [...results].sort(
+              (a, b) => new Date(b.listed_at) - new Date(a.listed_at),
+            );
+          }
+          // "Closest Location" and "Highest Demand" keep the model's own
+          // ranking, since geo-fit and quantity-fit are already baked into
+          // compatibility_score.
+
+          const scored = results.slice(0, 6).map((r) => {
+            const score = Math.round(r.compatibility_score);
+            const color =
+              score >= 90 ? "#22C55E" : score >= 75 ? "#FF9933" : "#2563EB";
+            const tags = [r.quantity_tonnes >= 10 ? "Bulk" : "Small Batch"];
+            if (r.variety && r.variety !== "Not Specified") tags.push(r.variety);
+            if (r.taluka) tags.push(r.taluka);
+
+            return {
+              score,
+              color,
+              farmer: `Farmer ${r.farmer_id}`,
+              crop: r.crop,
+              loc: [r.village, r.taluka, r.district].filter(Boolean).join(", "),
+              qty: `${r.quantity_tonnes} t`,
+              price: `₹${r.price_per_quintal}/qtl`,
+              tags,
+              listingId: r.listing_id,
+              farmerId: r.farmer_id,
+            };
+          });
+
+          setTimeout(() => {
+            pulse.classList.remove("show");
+            if (!scored.length) {
+              grid.innerHTML =
+                '<p style="color:var(--muted);padding:1rem;">No listings match these filters yet — try widening your search.</p>';
+              return;
+            }
+            renderMatches(scored);
+            showToast(
+              `🤖 Found ${scored.length} matching listing${scored.length > 1 ? "s" : ""} for you!`,
+            );
+          }, 900);
+        } catch (err) {
+          pulse.classList.remove("show");
+          grid.innerHTML =
+            '<p style="color:var(--muted);padding:1rem;">Could not reach the matching service — make sure the backend and ML service are running.</p>';
+          console.error("Smart matching error:", err);
+        }
+      }
+
+
+      // CHART
+      const chartData = {
+        cotton: [
+          11200, 11500, 12000, 12400, 12800, 13100, 13500, 13900, 14200, 14600,
+          15000, 15200,
+        ],
+        wheat: [
+          1800, 1900, 1950, 2050, 2100, 2200, 2300, 2400, 2500, 2600, 2700,
+          2820,
+        ],
+        soybean: [
+          3800, 3900, 4100, 4200, 4400, 4500, 4700, 4800, 4900, 5000, 5050,
+          5100,
+        ],
+        turmeric: [
+          8000, 8400, 8800, 9200, 9600, 10000, 10400, 10800, 11100, 11400,
+          11600, 11800,
+        ],
+      };
+      const labels = [
+        "Jan",
+        "Feb",
+        "Mar",
+        "Apr",
+        "May",
+        "Jun",
+        "Jul",
+        "Aug",
+        "Sep",
+        "Oct",
+        "Nov",
+        "Today",
+      ];
+
+      function drawChart(crop) {
+        const data = chartData[crop];
+        const svg = document.getElementById("price-chart");
+        const W = 600,
+          H = 180,
+          pad = { l: 10, r: 10, t: 10, b: 20 };
+        const min = Math.min(...data) * 0.95;
+        const max = Math.max(...data) * 1.02;
+        const xs = data.map(
+          (_, i) => pad.l + (i / (data.length - 1)) * (W - pad.l - pad.r),
+        );
+        const ys = data.map(
+          (v) => pad.t + (1 - (v - min) / (max - min)) * (H - pad.t - pad.b),
+        );
+
+        const pts = xs.map((x, i) => `${x},${ys[i]}`).join(" ");
+        const linePath = `M ${pts.split(" ").join(" L ")}`;
+        const areaPath = `M ${xs[0]},${H - pad.b} L ${pts.split(" ").join(" L ")} L ${xs[xs.length - 1]},${H - pad.b} Z`;
+
+        document.getElementById("line-path").setAttribute("d", linePath);
+        document.getElementById("area-path").setAttribute("d", areaPath);
+
+        const dotsG = document.getElementById("chart-dots");
+        dotsG.innerHTML = xs
+          .map(
+            (x, i) =>
+              `<circle cx="${x}" cy="${ys[i]}" r="3.5" fill="#22C55E" stroke="#ffffff" stroke-width="1.5"/>`,
+          )
+          .join("");
+        const farmerData = data.map((v) => v * 0.95);
+        const fy = farmerData.map(
+          (v) => pad.t + (1 - (v - min) / (max - min)) * (H - pad.t - pad.b),
+        );
+        const fpts = xs.map((x, i) => `${x},${fy[i]}`).join(" L ");
+        document.getElementById("red-line").setAttribute("d", `M ${fpts}`);
+
+        const labG = document.getElementById("chart-xlabels");
+        labG.innerHTML = xs
+          .map((x, i) => `<text x="${x}" y="${H - 2}">${labels[i]}</text>`)
+          .join("");
+      }
+
+      function setTab(btn, crop) {
+        document
+          .querySelectorAll(".ctab")
+          .forEach((b) => b.classList.remove("active"));
+        btn.classList.add("active");
+        drawChart(crop);
+      }
+
+      drawChart("cotton");
+
+      function showToast(msg) {
+        const t = document.getElementById("toast");
+        document.getElementById("toast-msg").textContent = msg;
+        t.classList.add("show");
+        setTimeout(() => t.classList.remove("show"), 3000);
+      }
+    </script>
+    <script src="auth-guard.js"></script>
+    <script src="api-client.js"></script>
+    <script>
+      window.addEventListener("DOMContentLoaded", () => {
+        const user = AuthGuard.getUser();
+        if (user && user.role === "farmer") {
+          document
+            .querySelectorAll(
+              'a[href="#matching"], a[href="buyer-dashboard.html"]',
+            )
+            .forEach((a) => {
+              const li = a.closest("li");
+              if (li) li.style.display = "none";
+            });
+          const matchingCard = document.getElementById("matching");
+          if (matchingCard) matchingCard.style.display = "none";
+
+          const pageTitle = document.querySelector(".page-title");
+          const pageSub = document.querySelector(".page-sub");
+          if (pageTitle) pageTitle.textContent = "📈 Price Intelligence";
+          if (pageSub)
+            pageSub.textContent =
+              "Live market data so you always know what your crop is really worth.";
+        } else if (user && user.role === "buyer") {
+          document
+            .querySelectorAll('a[href="farmer-dashboard.html"]')
+            .forEach((a) => {
+              const li = a.closest("li");
+              if (li) li.style.display = "none";
+            });
+        }
+      });
+    </script>
+
+    <!-- Purely decorative visual-effects script — no auth/business logic, no API calls -->
+    <script>
+      (function () {
+        // Preloader
+        window.addEventListener("load", () => {
+          const pl = document.getElementById("preloader");
+          if (pl) setTimeout(() => pl.classList.add("done"), 300);
+        });
+
+        // Custom cursor (dot + lagging ring)
+        const cDot = document.getElementById("cursor-dot");
+        const cRing = document.getElementById("cursor-ring");
+        if (cDot && cRing && window.matchMedia("(pointer:fine)").matches) {
+          let mx = 0, my = 0, rx = 0, ry = 0;
+          document.addEventListener("mousemove", (e) => {
+            mx = e.clientX; my = e.clientY;
+            cDot.style.left = mx + "px"; cDot.style.top = my + "px";
+          });
+          (function animateRing() {
+            rx += (mx - rx) * 0.15; ry += (my - ry) * 0.15;
+            cRing.style.left = rx + "px"; cRing.style.top = ry + "px";
+            requestAnimationFrame(animateRing);
+          })();
+          document.body.addEventListener("mouseover", (e) => {
+            const t = e.target.closest("a, button, .btn, .card, .match-card, .sidebar-nav li a");
+            if (t) cRing.classList.add("hover");
+          });
+          document.body.addEventListener("mouseout", (e) => {
+            const t = e.target.closest("a, button, .btn, .card, .match-card, .sidebar-nav li a");
+            if (t) cRing.classList.remove("hover");
+          });
+        }
+
+        // Click burst particles on primary action buttons
+        const BURST_EMOJI = ["🌿", "🍃", "✨", "🌾"];
+        document.body.addEventListener("click", (e) => {
+          const t = e.target.closest(".btn-green, .btn-purple");
+          if (!t) return;
+          for (let i = 0; i < 7; i++) {
+            const p = document.createElement("span");
+            p.className = "burst-particle";
+            p.textContent = BURST_EMOJI[Math.floor(Math.random() * BURST_EMOJI.length)];
+            const angle = Math.random() * Math.PI * 2;
+            const dist = 35 + Math.random() * 45;
+            p.style.setProperty("--bx", Math.cos(angle) * dist + "px");
+            p.style.setProperty("--by", Math.sin(angle) * dist + "px");
+            p.style.setProperty("--br", Math.random() * 360 + "deg");
+            p.style.left = e.clientX + "px";
+            p.style.top = e.clientY + "px";
+            document.body.appendChild(p);
+            setTimeout(() => p.remove(), 900);
+          }
+        });
+      })();
+    </script>
+  </body>
+</html>

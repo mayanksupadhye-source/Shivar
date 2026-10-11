@@ -1,0 +1,830 @@
+<!DOCTYPE html>
+<html lang="en" id="html-root">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Shivar — Climate Intelligence</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;600;700&family=Noto+Sans+Devanagari:wght@400;500;600;700&family=Noto+Sans+Gurmukhi:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<style>
+  *,*::before,*::after{margin:0;padding:0;box-sizing:border-box;}
+  :root{
+    --sky:#F0F9FF; --meadow:#F0FDF4; --field:#DCFCE7;
+    --leaf:#15803D; --leaf-deep:#14532D; --lime:#22C55E;
+    --blue:#2563EB; --blue-deep:#1E3A8A; --blue-soft:#DBEAFE;
+    --gold:#FF9933; --gold-deep:#B35F00;
+    --danger:#DC2626; --danger-deep:#7F1D1D; --danger-soft:#FEE2E2;
+    --sand:#F8FAFC;
+    --text-main:#17352A; --text-muted:#526B61;
+    --line: rgba(20,83,45,0.16);
+    --card: rgba(255,255,255,0.88);
+    --accent: var(--leaf);          /* Climate page — green-led, blue for water, gold/red for risk */
+    --accent-deep: var(--leaf-deep);
+    --mono:'DM Mono', ui-monospace, monospace;
+  }
+  html{scroll-behavior:smooth;}
+  body{font-family:'DM Sans',sans-serif; background:linear-gradient(180deg,var(--meadow) 0%, var(--sky) 55%, var(--meadow) 100%); color:var(--text-main); cursor:auto; overflow-x:hidden;}
+  [lang="hi"], [lang="mr"] { font-family:'Noto Sans Devanagari','DM Sans',sans-serif; }
+  [lang="pa"] { font-family:'Noto Sans Gurmukhi','DM Sans',sans-serif; }
+  [lang="hi"] h1, [lang="mr"] h1 { font-family:'Noto Sans Devanagari',serif; }
+  [lang="pa"] h1 { font-family:'Noto Sans Gurmukhi',serif; }
+
+  /* ambient sky layer behind everything — sun drifts, clouds pass, rain when it's raining */
+  #sky-stage{position:fixed; inset:0; z-index:0; pointer-events:none; overflow:hidden; opacity:.55;}
+  .sky-orb{position:absolute; top:6%; left:8%; width:120px; height:120px; border-radius:50%; background:radial-gradient(circle at 35% 35%, #FFE7B0, var(--gold) 70%); filter:blur(1px); box-shadow:0 0 70px 20px rgba(255,153,51,.25); animation:orbDrift 34s ease-in-out infinite;}
+  @keyframes orbDrift{0%,100%{transform:translate(0,0);}50%{transform:translate(6vw,4vh);}}
+  .sky-cloud{position:absolute; opacity:.5; animation:cloudDrift linear infinite;}
+  @keyframes cloudDrift{from{transform:translateX(-20vw);}to{transform:translateX(120vw);}}
+  .rain-layer{position:absolute; inset:0; opacity:0; transition:opacity .8s ease;}
+  .rain-layer.show{opacity:.4;}
+  .drop{position:absolute; width:1.5px; height:14px; background:linear-gradient(var(--blue),transparent); top:-5%; animation:dropFall linear infinite;}
+  @keyframes dropFall{to{transform:translateY(110vh);}}
+
+  nav{position:relative; z-index:10; display:flex; align-items:center; justify-content:space-between; padding:1.5rem 4rem; flex-wrap:wrap; gap:1rem;}
+  .nav-logo{font-family:'Playfair Display',serif; font-size:1.4rem; font-weight:900; color:var(--leaf-deep); text-decoration:none;}
+  .nav-logo span{color:var(--blue-deep);}
+  .back-link{display:inline-flex; align-items:center; gap:.4rem; font-size:.88rem; font-weight:600; color:var(--text-muted); text-decoration:none;}
+  .back-link:hover{color:var(--accent-deep);}
+  .lang-grid{display:flex; gap:.4rem; flex-wrap:wrap;}
+  .lang-pill{font-size:.82rem; font-weight:500; padding:.4rem .9rem; border-radius:99px; border:1.3px solid var(--line); background:var(--card); color:var(--text-main); cursor:pointer; transition:.18s;}
+  .lang-pill:hover{border-color:var(--accent);}
+  .lang-pill.active{background:var(--accent); color:#fff; border-color:transparent;}
+
+  .page-hero{position:relative; z-index:2; max-width:800px; margin:2rem auto 2rem; padding:0 2rem; text-align:center;}
+  .eyebrow{display:inline-flex; align-items:center; gap:.5rem; font-size:.76rem; letter-spacing:2px; text-transform:uppercase; color:var(--accent-deep); background:color-mix(in srgb, var(--accent) 12%, white); border:1px solid var(--line); padding:.4rem 1rem; border-radius:99px; margin-bottom:1.3rem; font-weight:600;}
+  .eyebrow .dot{width:7px;height:7px;border-radius:50%;background:var(--lime); box-shadow:0 0 0 3px rgba(21,128,61,.18); animation:pulse 1.8s ease-in-out infinite;}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.35;}}
+  h1{font-family:'Playfair Display',serif; font-weight:900; font-size:clamp(1.9rem,4.4vw,3rem); color:var(--accent-deep); line-height:1.15; margin-bottom:.8rem;}
+  .page-sub{color:var(--text-muted); font-size:1.02rem;}
+
+  .container{position:relative; z-index:2; max-width:1180px; margin:0 auto; padding:0 2rem 5rem;}
+
+  /* ── location bar ── */
+  .locbar{display:flex; gap:.7rem; flex-wrap:wrap; align-items:center; justify-content:center; background:var(--card); border:1.5px solid var(--line); border-radius:16px; padding:1rem 1.3rem; margin-bottom:1.6rem; box-shadow:0 8px 24px rgba(20,83,45,.06);}
+  .locbar form{display:flex; gap:.5rem; flex:1 1 320px;}
+  .locbar input{flex:1; border:1.5px solid var(--line); border-radius:10px; padding:.65rem 1rem; font-family:inherit; font-size:.92rem; background:#fff; color:var(--text-main);}
+  .locbar input:focus{outline:none; border-color:var(--accent);}
+  .btn{display:inline-flex; align-items:center; gap:.4rem; border:none; border-radius:10px; padding:.65rem 1.1rem; font-family:inherit; font-weight:600; font-size:.88rem; cursor:pointer; transition:transform .15s, box-shadow .15s;}
+  .btn:hover{transform:translateY(-1px);}
+  .btn-solid{background:linear-gradient(135deg,var(--leaf),var(--blue)); color:#fff; box-shadow:0 8px 20px rgba(21,128,61,.28);}
+  .btn-ghost{background:#fff; color:var(--accent-deep); border:1.5px solid var(--line);}
+  .loc-chip{font-size:.85rem; color:var(--text-muted); display:flex; align-items:center; gap:.4rem;}
+  .loc-chip b{color:var(--accent-deep);}
+  #geo-suggest{position:relative;}
+  .suggest-list{position:absolute; top:calc(100% + 6px); left:0; right:0; background:#fff; border:1.5px solid var(--line); border-radius:12px; overflow:hidden; box-shadow:0 14px 30px rgba(20,83,45,.14); z-index:20; display:none;}
+  .suggest-list.show{display:block;}
+  .suggest-item{padding:.6rem .9rem; font-size:.87rem; cursor:pointer; border-bottom:1px solid var(--line);}
+  .suggest-item:last-child{border-bottom:none;}
+  .suggest-item:hover{background:var(--field);}
+
+  #status-banner{max-width:1180px; margin:0 auto 1.2rem; padding:0 2rem; text-align:center; font-size:.9rem; color:var(--text-muted);}
+  #status-banner.err{color:var(--danger-deep);}
+
+  /* ── current conditions hero card ── */
+  .now-card{position:relative; overflow:hidden; display:flex; flex-wrap:wrap; gap:2rem; align-items:center; justify-content:space-between; background:linear-gradient(120deg, rgba(255,255,255,.92), rgba(240,253,244,.88)); border:1.5px solid var(--line); border-radius:22px; padding:2rem 2.2rem; margin-bottom:1.6rem; box-shadow:0 16px 40px rgba(20,83,45,.1);}
+  .now-left{display:flex; align-items:center; gap:1.4rem;}
+  .now-icon{width:88px; height:88px; flex-shrink:0;}
+  .now-temp{font-family:'Playfair Display',serif; font-weight:900; font-size:3.4rem; color:var(--accent-deep); line-height:1;}
+  .now-cond{font-size:1.05rem; font-weight:600; color:var(--text-main); margin-top:.3rem;}
+  .now-place{font-size:.85rem; color:var(--text-muted); margin-top:.2rem;}
+  .now-stats{display:grid; grid-template-columns:repeat(2,minmax(110px,1fr)); gap:.9rem 1.8rem;}
+  .now-stat .k{font-size:.72rem; text-transform:uppercase; letter-spacing:.6px; color:var(--text-muted); margin-bottom:.15rem;}
+  .now-stat .v{font-family:var(--mono); font-size:1.05rem; font-weight:500; color:var(--text-main);}
+  .updated-tag{position:absolute; top:1rem; right:1.2rem; font-size:.72rem; color:var(--text-muted); font-family:var(--mono);}
+
+  /* ── forecast strip ── */
+  .section-label{font-size:.78rem; font-weight:700; letter-spacing:1.4px; text-transform:uppercase; color:var(--accent-deep); margin:0 0 .8rem .2rem; display:flex; align-items:center; gap:.5rem;}
+  .section-label::after{content:''; flex:1; height:1px; background:var(--line);}
+  .forecast-strip{display:grid; grid-template-columns:repeat(7,1fr); gap:.7rem; margin-bottom:1.8rem;}
+  @media(max-width:900px){.forecast-strip{grid-template-columns:repeat(4,1fr);} }
+  @media(max-width:560px){.forecast-strip{grid-template-columns:repeat(3,1fr);} }
+  .fday{background:var(--card); border:1.5px solid var(--line); border-radius:14px; padding:.9rem .5rem; text-align:center; transition:transform .18s, box-shadow .18s;}
+  .fday:hover{transform:translateY(-3px); box-shadow:0 10px 22px rgba(20,83,45,.1);}
+  .fday .d{font-size:.76rem; font-weight:700; color:var(--text-muted); text-transform:uppercase;}
+  .fday svg{width:34px; height:34px; margin:.4rem 0;}
+  .fday .hi{font-weight:700; font-size:.95rem; color:var(--text-main);}
+  .fday .lo{font-size:.8rem; color:var(--text-muted);}
+  .fday .rain{font-size:.72rem; color:var(--blue-deep); margin-top:.25rem; font-family:var(--mono);}
+
+  /* ── two-up charts ── */
+  .grid-2{display:grid; grid-template-columns:1.15fr .85fr; gap:1.4rem; margin-bottom:1.8rem;}
+  @media(max-width:860px){.grid-2{grid-template-columns:1fr;}}
+  .panel{background:var(--card); border:1.5px solid var(--line); border-radius:18px; padding:1.5rem 1.6rem;}
+  .panel h3{font-family:'Playfair Display',serif; font-size:1.1rem; color:var(--text-main); margin-bottom:.2rem;}
+  .panel .sub{font-size:.82rem; color:var(--text-muted); margin-bottom:1rem;}
+  .legend{display:flex; gap:1.2rem; font-size:.76rem; color:var(--text-muted); margin-top:.6rem; flex-wrap:wrap;}
+  .legend span{display:inline-flex; align-items:center; gap:.35rem;}
+  .legend i{width:10px;height:10px;border-radius:3px; display:inline-block;}
+
+  /* ── risk cards ── */
+  .risk-row{display:grid; grid-template-columns:repeat(3,1fr); gap:1.2rem; margin-bottom:1.8rem;}
+  @media(max-width:860px){.risk-row{grid-template-columns:1fr;}}
+  .risk-card{background:var(--card); border:1.5px solid var(--line); border-radius:18px; padding:1.5rem; display:flex; gap:1.2rem; align-items:center;}
+  .ring-wrap{position:relative; width:86px; height:86px; flex-shrink:0;}
+  .ring-wrap svg{transform:rotate(-90deg);}
+  .ring-bg{fill:none; stroke:var(--line); stroke-width:9;}
+  .ring-fg{fill:none; stroke-width:9; stroke-linecap:round; transition:stroke-dashoffset 1s cubic-bezier(.22,1,.36,1), stroke .3s;}
+  .ring-label{position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-family:var(--mono); font-weight:600; font-size:.95rem;}
+  .risk-body .rt{font-weight:700; font-size:.98rem; margin-bottom:.15rem;}
+  .risk-body .rl{display:inline-block; font-size:.72rem; font-weight:700; letter-spacing:.4px; text-transform:uppercase; padding:.18rem .55rem; border-radius:6px; margin-bottom:.4rem;}
+  .risk-body .rd{font-size:.82rem; color:var(--text-muted); line-height:1.4;}
+  .sev-low{color:var(--leaf-deep); background:var(--field);}
+  .sev-mod{color:var(--gold-deep); background:#FFF1DC;}
+  .sev-high{color:var(--danger-deep); background:var(--danger-soft);}
+
+  /* ── agronomy tiles ── */
+  .agro-row{display:grid; grid-template-columns:repeat(4,1fr); gap:1rem; margin-bottom:1.8rem;}
+  @media(max-width:860px){.agro-row{grid-template-columns:repeat(2,1fr);}}
+  .agro-tile{background:var(--card); border:1.5px solid var(--line); border-radius:16px; padding:1.2rem;}
+  .agro-tile .k{font-size:.75rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:.5px; margin-bottom:.4rem;}
+  .agro-tile .v{font-family:var(--mono); font-size:1.4rem; font-weight:600; color:var(--accent-deep);}
+  .agro-tile .u{font-size:.78rem; color:var(--text-muted); margin-left:.2rem;}
+  .agro-tile .note{font-size:.78rem; color:var(--text-muted); margin-top:.35rem; line-height:1.35;}
+  .stage-select{margin-top:.4rem; width:100%; border:1.5px solid var(--line); border-radius:8px; padding:.4rem .5rem; font-family:inherit; font-size:.82rem; background:#fff; color:var(--text-main);}
+
+  /* ── advisory banner ── */
+  .advisory{display:flex; gap:1rem; align-items:flex-start; border-radius:18px; padding:1.3rem 1.6rem; margin-bottom:1.8rem; border:1.5px solid; }
+  .advisory.low{background:var(--field); border-color:rgba(21,128,61,.25);}
+  .advisory.mod{background:#FFF3E0; border-color:rgba(179,95,0,.25);}
+  .advisory.high{background:var(--danger-soft); border-color:rgba(127,29,29,.25);}
+  .advisory svg{width:26px;height:26px;flex-shrink:0; margin-top:.1rem;}
+  .advisory .at{font-weight:700; font-size:.92rem; margin-bottom:.25rem;}
+  .advisory .ab{font-size:.88rem; color:var(--text-main); line-height:1.5;}
+
+  .build-note{margin-top:1rem;}
+  .build-note-inner{border-left:4px solid var(--accent); background:var(--card); border-radius:0 12px 12px 0; padding:1.3rem 1.6rem;}
+  .build-note-inner .label{font-size:.75rem; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:var(--accent-deep); margin-bottom:.4rem;}
+  .build-note-inner p{font-size:.87rem; color:var(--text-muted); line-height:1.55;}
+
+  .skeleton{animation:shimmer 1.4s ease-in-out infinite; background:linear-gradient(90deg, var(--field) 25%, #eafaf0 37%, var(--field) 63%); background-size:400% 100%; border-radius:8px;}
+  @keyframes shimmer{0%{background-position:100% 50%;}100%{background-position:0 50%;}}
+
+  @media (prefers-reduced-motion:reduce){*{animation-duration:.001ms !important; transition-duration:.001ms !important;}}
+  a:focus-visible,button:focus-visible,.lang-pill:focus-visible,input:focus-visible{outline:2.5px solid var(--accent); outline-offset:2px;}
+</style>
+</head>
+<body>
+
+<div id="sky-stage">
+  <div class="sky-orb" id="sky-orb"></div>
+  <div class="rain-layer" id="rain-layer"></div>
+</div>
+
+<nav>
+  <a class="nav-logo" href="nexora-first-page.html" style="text-decoration:none;">Shivar<span>.</span></a>
+  <a class="back-link" id="back-link" href="nexora-first-page.html">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M11 18l-6-6 6-6"/></svg>
+    <span data-i18n="navBack">Back to Home</span>
+  </a>
+  <div class="lang-grid" id="lang-grid">
+    <button class="lang-pill" data-lang="en">English</button>
+    <button class="lang-pill" data-lang="hi">हिंदी</button>
+    <button class="lang-pill" data-lang="mr">मराठी</button>
+    <button class="lang-pill" data-lang="pa">ਪੰਜਾਬੀ</button>
+  </div>
+</nav>
+
+<section class="page-hero">
+  <span class="eyebrow"><span class="dot"></span><span data-i18n="eyebrow">Climate Intelligence</span></span>
+  <h1 data-i18n="title">Know the sky before it changes.</h1>
+  <p class="page-sub" data-i18n="subtitle">Live forecast, soil conditions, and crop risk — for this farm's exact location, right now.</p>
+</section>
+
+<div class="container">
+
+  <div class="locbar">
+    <div id="geo-suggest" style="flex:1 1 320px; position:relative;">
+      <form id="loc-form">
+        <input id="loc-input" type="text" data-i18n-ph="searchPlaceholder" placeholder="Search village, taluka or city…" autocomplete="off"/>
+        <button class="btn btn-solid" type="submit" data-i18n="searchBtn">Search</button>
+      </form>
+      <div class="suggest-list" id="suggest-list"></div>
+    </div>
+    <button class="btn btn-ghost" id="geo-btn" type="button">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
+      <span data-i18n="useLocationBtn">Use my location</span>
+    </button>
+    <span class="loc-chip"><span data-i18n="showingLabel">Showing:</span>&nbsp;<b id="loc-name">Nashik, Maharashtra</b></span>
+  </div>
+
+  <div id="status-banner"></div>
+
+  <!-- CURRENT CONDITIONS -->
+  <div class="now-card" id="now-card">
+    <span class="updated-tag" id="updated-tag">—</span>
+    <div class="now-left">
+      <svg class="now-icon" id="now-icon" viewBox="0 0 64 64"></svg>
+      <div>
+        <div class="now-temp"><span id="now-temp">--</span>°</div>
+        <div class="now-cond" id="now-cond" data-i18n="loadingText">Loading live conditions…</div>
+        <div class="now-place" id="now-place"></div>
+      </div>
+    </div>
+    <div class="now-stats">
+      <div class="now-stat"><div class="k" data-i18n="feelsLike">Feels like</div><div class="v" id="stat-feels">--°</div></div>
+      <div class="now-stat"><div class="k" data-i18n="humidity">Humidity</div><div class="v" id="stat-humidity">--%</div></div>
+      <div class="now-stat"><div class="k" data-i18n="wind">Wind</div><div class="v" id="stat-wind">-- km/h</div></div>
+      <div class="now-stat"><div class="k" data-i18n="uvIndex">UV index</div><div class="v" id="stat-uv">--</div></div>
+    </div>
+  </div>
+
+  <!-- 7 DAY FORECAST -->
+  <div class="section-label" data-i18n="forecastLabel">7-Day Forecast</div>
+  <div class="forecast-strip" id="forecast-strip"></div>
+
+  <!-- CHARTS -->
+  <div class="grid-2">
+    <div class="panel">
+      <h3 data-i18n="rainChartTitle">Rainfall — last 14 days &amp; next 7</h3>
+      <p class="sub" data-i18n="rainChartSub">Daily precipitation. The line marks today.</p>
+      <svg id="rain-chart" viewBox="0 0 640 200" style="width:100%;height:auto;"></svg>
+      <div class="legend">
+        <span><i style="background:var(--blue-deep);"></i><span data-i18n="legendHistorical">Recorded</span></span>
+        <span><i style="background:var(--blue);opacity:.55;"></i><span data-i18n="legendForecast">Forecast</span></span>
+      </div>
+    </div>
+    <div class="panel">
+      <h3 data-i18n="tempChartTitle">Temperature range</h3>
+      <p class="sub" data-i18n="tempChartSub">Daily high / low, next 7 days.</p>
+      <svg id="temp-chart" viewBox="0 0 320 200" style="width:100%;height:auto;"></svg>
+      <div class="legend">
+        <span><i style="background:var(--gold);"></i><span data-i18n="legendHigh">High</span></span>
+        <span><i style="background:var(--blue);"></i><span data-i18n="legendLow">Low</span></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- RISK -->
+  <div class="section-label" data-i18n="riskLabel">Climate Risk — Next 7 Days</div>
+  <div class="risk-row" id="risk-row"></div>
+
+  <!-- ADVISORY -->
+  <div id="advisory-wrap"></div>
+
+  <!-- AGRONOMY -->
+  <div class="section-label" data-i18n="agroLabel">Soil &amp; Crop Conditions</div>
+  <div class="agro-row" id="agro-row"></div>
+
+  <div class="build-note">
+    <div class="build-note-inner">
+      <div class="label" data-i18n="buildLabel">Build Note</div>
+      <p data-i18n="buildText">This page runs on live public weather and climate data (Open-Meteo) for whatever location is searched — forecast, soil moisture, evapotranspiration, and 14-day rainfall history. The three risk scores are a transparent rule-based index computed in the browser from that data and the selected crop stage, not a trained model — it feeds the same Shivar AI Decision Engine that Market and Ecosystem Intelligence use, and will move server-side as the crop-stage and district calendars grow.</p>
+    </div>
+  </div>
+
+</div>
+
+<script>
+/* ============================= I18N ============================= */
+const I18N = {
+  en: {
+    navBack:"Back to Home", eyebrow:"Climate Intelligence", title:"Know the sky before it changes.",
+    subtitle:"Live forecast, soil conditions, and crop risk — for this farm's exact location, right now.",
+    searchPlaceholder:"Search village, taluka or city…", searchBtn:"Search", useLocationBtn:"Use my location",
+    showingLabel:"Showing:", loadingText:"Loading live conditions…", detecting:"Finding your location…",
+    errNoResults:"No place matched that search — try a nearby town or district.",
+    errGeo:"Couldn't get your location — search a place name instead.", errFetch:"Live weather data didn't load — check your connection and try again.",
+    feelsLike:"Feels like", humidity:"Humidity", wind:"Wind", uvIndex:"UV index",
+    updatedPrefix:"Updated", forecastLabel:"7-Day Forecast",
+    rainChartTitle:"Rainfall — last 14 days & next 7", rainChartSub:"Daily precipitation. The line marks today.",
+    tempChartTitle:"Temperature range", tempChartSub:"Daily high / low, next 7 days.",
+    legendHistorical:"Recorded", legendForecast:"Forecast", legendHigh:"High", legendLow:"Low",
+    riskLabel:"Climate Risk — Next 7 Days",
+    drought:"Drought Risk", flood:"Flood / Excess Rain", heat:"Heat Stress",
+    sevLow:"Low", sevMod:"Moderate", sevHigh:"High",
+    droughtDesc:"Rainfall supply vs. crop water demand (ET₀) over the coming week.",
+    floodDesc:"Chance of waterlogging from heavy or sustained rainfall.",
+    heatDesc:"Days forecast above the safe temperature for the selected crop stage.",
+    agroLabel:"Soil & Crop Conditions",
+    soilMoisture:"Soil Moisture", soilMoistureNote:"Top layer (0–1cm), live estimate.",
+    soilTemp:"Soil Temperature", soilTempNote:"Affects germination and root uptake.",
+    et0:"Crop Water Demand", et0Note:"Evapotranspiration — how fast the crop is using water.",
+    cropStage:"Crop stage", stageSowing:"Sowing", stageVegetative:"Vegetative", stageFlowering:"Flowering", stageHarvest:"Near harvest",
+    advisoryTitle:"Today's advisory",
+    adv:{
+      drought:{low:"Water supply looks adequate for now — no irrigation action needed.", mod:"Rainfall is running behind crop demand — plan an irrigation cycle in the next 2–3 days.", high:"Significant water deficit ahead — irrigate as soon as possible and prioritise the most water-sensitive plots."},
+      flood:{low:"No excess-rain concern this week.", mod:"Moderate heavy rain expected — clear field drains before it arrives.", high:"Heavy rainfall risk is high — clear drainage now and delay any fresh sowing or fertiliser application."},
+      heat:{low:"Temperatures stay in a safe range for this crop stage.", mod:"A few hot days ahead — irrigate early morning or evening to ease heat stress.", high:"Sustained heat stress expected for this crop stage — irrigate to cool the root zone and avoid midday field work."}
+    },
+    buildLabel:"Build Note",
+    buildText:"This page runs on live public weather and climate data (Open-Meteo) for whatever location is searched — forecast, soil moisture, evapotranspiration, and 14-day rainfall history. The three risk scores are a transparent rule-based index computed in the browser from that data and the selected crop stage, not a trained model — it feeds the same Shivar AI Decision Engine that Market and Ecosystem Intelligence use, and will move server-side as the crop-stage and district calendars grow.",
+    wx:{clear:"Clear sky",partlyCloudy:"Partly cloudy",cloudy:"Overcast",fog:"Fog",drizzle:"Light drizzle",rain:"Rain",heavyRain:"Heavy rain",showers:"Rain showers",thunder:"Thunderstorm",snow:"Snow"}
+  },
+  hi: {
+    navBack:"होम पर वापस जाएं", eyebrow:"जलवायु इंटेलिजेंस", title:"बदलाव से पहले आसमान को समझें।",
+    subtitle:"अभी इसी खेत के स्थान के लिए — लाइव पूर्वानुमान, मिट्टी की स्थिति, और फसल जोखिम।",
+    searchPlaceholder:"गाँव, तालुका या शहर खोजें…", searchBtn:"खोजें", useLocationBtn:"मेरा स्थान उपयोग करें",
+    showingLabel:"दिखा रहे हैं:", loadingText:"लाइव मौसम लोड हो रहा है…", detecting:"आपका स्थान खोजा जा रहा है…",
+    errNoResults:"इस खोज से कोई जगह नहीं मिली — पास के शहर या ज़िले से खोजें।",
+    errGeo:"आपका स्थान नहीं मिल सका — इसके बजाय जगह का नाम खोजें।", errFetch:"लाइव मौसम डेटा लोड नहीं हुआ — कनेक्शन जाँचें और फिर कोशिश करें।",
+    feelsLike:"महसूस होता है", humidity:"नमी", wind:"हवा", uvIndex:"यूवी इंडेक्स",
+    updatedPrefix:"अपडेट किया गया", forecastLabel:"7-दिन का पूर्वानुमान",
+    rainChartTitle:"वर्षा — पिछले 14 दिन और अगले 7", rainChartSub:"दैनिक वर्षा। रेखा आज को दर्शाती है।",
+    tempChartTitle:"तापमान सीमा", tempChartSub:"अगले 7 दिनों का दैनिक अधिकतम / न्यूनतम।",
+    legendHistorical:"दर्ज", legendForecast:"पूर्वानुमान", legendHigh:"अधिकतम", legendLow:"न्यूनतम",
+    riskLabel:"जलवायु जोखिम — अगले 7 दिन",
+    drought:"सूखे का जोखिम", flood:"बाढ़ / अत्यधिक वर्षा", heat:"गर्मी का तनाव",
+    sevLow:"कम", sevMod:"मध्यम", sevHigh:"उच्च",
+    droughtDesc:"आने वाले सप्ताह में वर्षा आपूर्ति बनाम फसल जल माँग (ET₀)।",
+    floodDesc:"भारी या लगातार वर्षा से जलभराव की संभावना।",
+    heatDesc:"चुने गए फसल चरण के लिए सुरक्षित तापमान से ऊपर के दिन।",
+    agroLabel:"मिट्टी और फसल की स्थिति",
+    soilMoisture:"मिट्टी की नमी", soilMoistureNote:"ऊपरी परत (0–1 सेमी), लाइव अनुमान।",
+    soilTemp:"मिट्टी का तापमान", soilTempNote:"अंकुरण और जड़ द्वारा अवशोषण को प्रभावित करता है।",
+    et0:"फसल जल माँग", et0Note:"वाष्पोत्सर्जन — फसल कितनी तेज़ी से पानी उपयोग कर रही है।",
+    cropStage:"फसल चरण", stageSowing:"बुवाई", stageVegetative:"वानस्पतिक", stageFlowering:"फूल आना", stageHarvest:"कटाई निकट",
+    advisoryTitle:"आज की सलाह",
+    adv:{
+      drought:{low:"फ़िलहाल जल आपूर्ति पर्याप्त लग रही है — सिंचाई की ज़रूरत नहीं।", mod:"वर्षा फसल की माँग से पीछे चल रही है — अगले 2–3 दिनों में सिंचाई की योजना बनाएं।", high:"आगे बड़ी जल कमी की आशंका है — जल्द से जल्द सिंचाई करें और सबसे संवेदनशील खेतों को प्राथमिकता दें।"},
+      flood:{low:"इस सप्ताह अत्यधिक वर्षा की चिंता नहीं है।", mod:"मध्यम भारी वर्षा की संभावना — आने से पहले खेत की नालियाँ साफ़ करें।", high:"भारी वर्षा का जोखिम अधिक है — अभी नालियाँ साफ़ करें और नई बुवाई या उर्वरक डालना टालें।"},
+      heat:{low:"इस फसल चरण के लिए तापमान सुरक्षित सीमा में रहेगा।", mod:"आगे कुछ गर्म दिन हैं — गर्मी का तनाव कम करने के लिए सुबह या शाम सिंचाई करें।", high:"इस फसल चरण के लिए लगातार गर्मी का तनाव अपेक्षित है — जड़ क्षेत्र को ठंडा रखने के लिए सिंचाई करें और दोपहर में खेत का काम न करें।"}
+    },
+    buildLabel:"बिल्ड नोट",
+    buildText:"यह पेज खोजे गए किसी भी स्थान के लिए लाइव सार्वजनिक मौसम और जलवायु डेटा (Open-Meteo) पर चलता है — पूर्वानुमान, मिट्टी की नमी, वाष्पोत्सर्जन और 14-दिन की वर्षा का इतिहास। तीनों जोखिम स्कोर उस डेटा और चुने गए फसल चरण से ब्राउज़र में गणना किया गया एक पारदर्शी नियम-आधारित सूचकांक हैं, प्रशिक्षित मॉडल नहीं — यह उसी नेक्सोरा एआई निर्णय इंजन को डेटा देता है जिसे बाज़ार और पारिस्थितिकी तंत्र इंटेलिजेंस उपयोग करते हैं, और फसल-चरण व ज़िला कैलेंडर बढ़ने के साथ यह सर्वर-साइड चला जाएगा।",
+    wx:{clear:"साफ़ आसमान",partlyCloudy:"आंशिक बादल",cloudy:"घने बादल",fog:"कोहरा",drizzle:"हल्की बूंदाबांदी",rain:"वर्षा",heavyRain:"भारी वर्षा",showers:"वर्षा की बौछारें",thunder:"आंधी-तूफ़ान",snow:"बर्फ़बारी"}
+  },
+  mr: {
+    navBack:"मुख्यपृष्ठावर परत जा", eyebrow:"हवामान इंटेलिजन्स", title:"बदल होण्याआधी आकाश समजून घ्या.",
+    subtitle:"आत्ता याच शेताच्या स्थानासाठी — थेट अंदाज, मातीची स्थिती आणि पीक धोका.",
+    searchPlaceholder:"गाव, तालुका किंवा शहर शोधा…", searchBtn:"शोधा", useLocationBtn:"माझे स्थान वापरा",
+    showingLabel:"दाखवत आहे:", loadingText:"थेट हवामान लोड होत आहे…", detecting:"तुमचे स्थान शोधले जात आहे…",
+    errNoResults:"या शोधासाठी कोणतेही ठिकाण सापडले नाही — जवळचे शहर किंवा जिल्हा शोधा.",
+    errGeo:"तुमचे स्थान मिळाले नाही — त्याऐवजी ठिकाणाचे नाव शोधा.", errFetch:"थेट हवामान डेटा लोड झाला नाही — कनेक्शन तपासा आणि पुन्हा प्रयत्न करा.",
+    feelsLike:"जाणवते", humidity:"आर्द्रता", wind:"वारा", uvIndex:"यूव्ही इंडेक्स",
+    updatedPrefix:"अद्ययावत", forecastLabel:"7-दिवसांचा अंदाज",
+    rainChartTitle:"पाऊस — मागील 14 दिवस आणि पुढील 7", rainChartSub:"दैनिक पर्जन्यमान. रेषा आजचा दिवस दर्शवते.",
+    tempChartTitle:"तापमान श्रेणी", tempChartSub:"पुढील 7 दिवसांचे दैनिक कमाल / किमान.",
+    legendHistorical:"नोंदवलेले", legendForecast:"अंदाज", legendHigh:"कमाल", legendLow:"किमान",
+    riskLabel:"हवामान धोका — पुढील 7 दिवस",
+    drought:"दुष्काळाचा धोका", flood:"पूर / अतिवृष्टी", heat:"उष्णतेचा ताण",
+    sevLow:"कमी", sevMod:"मध्यम", sevHigh:"जास्त",
+    droughtDesc:"पुढील आठवड्यात पावसाचा पुरवठा विरुद्ध पिकाची पाण्याची गरज (ET₀).",
+    floodDesc:"जास्त किंवा सतत पावसामुळे पाणी साचण्याची शक्यता.",
+    heatDesc:"निवडलेल्या पीक अवस्थेसाठी सुरक्षित तापमानापेक्षा जास्त असलेले दिवस.",
+    agroLabel:"माती आणि पिकाची स्थिती",
+    soilMoisture:"मातीतील ओलावा", soilMoistureNote:"वरचा थर (0–1 सेमी), थेट अंदाज.",
+    soilTemp:"मातीचे तापमान", soilTempNote:"उगवण आणि मुळांद्वारे शोषणावर परिणाम करते.",
+    et0:"पिकाची पाण्याची गरज", et0Note:"बाष्पीभवन-उत्सर्जन — पीक किती वेगाने पाणी वापरत आहे.",
+    cropStage:"पीक अवस्था", stageSowing:"पेरणी", stageVegetative:"वाढीची अवस्था", stageFlowering:"फुलोरा", stageHarvest:"काढणी जवळ",
+    advisoryTitle:"आजचा सल्ला",
+    adv:{
+      drought:{low:"सध्या पाणीपुरवठा पुरेसा दिसतो — सिंचनाची गरज नाही.", mod:"पाऊस पिकाच्या मागणीपेक्षा कमी आहे — पुढील 2–3 दिवसांत सिंचनाचे नियोजन करा.", high:"पुढे मोठी पाणी टंचाई अपेक्षित आहे — लवकरात लवकर सिंचन करा आणि सर्वाधिक संवेदनशील शेतांना प्राधान्य द्या."},
+      flood:{low:"या आठवड्यात अतिवृष्टीची चिंता नाही.", mod:"मध्यम जोरदार पावसाची शक्यता — येण्यापूर्वी शेतातील पाणी निचरा साफ करा.", high:"जोरदार पावसाचा धोका जास्त आहे — आत्ताच निचरा साफ करा आणि नवीन पेरणी किंवा खत देणे पुढे ढकला."},
+      heat:{low:"या पीक अवस्थेसाठी तापमान सुरक्षित मर्यादेत राहील.", mod:"पुढे काही उष्ण दिवस आहेत — उष्णतेचा ताण कमी करण्यासाठी सकाळी किंवा संध्याकाळी सिंचन करा.", high:"या पीक अवस्थेसाठी सतत उष्णतेचा ताण अपेक्षित आहे — मुळांचा भाग थंड ठेवण्यासाठी सिंचन करा आणि दुपारी शेतातील काम टाळा."}
+    },
+    buildLabel:"बिल्ड नोंद",
+    buildText:"हे पान शोधलेल्या कोणत्याही स्थानासाठी थेट सार्वजनिक हवामान आणि हवामान डेटावर (Open-Meteo) चालते — अंदाज, मातीतील ओलावा, बाष्पीभवन-उत्सर्जन आणि 14-दिवसांचा पावसाचा इतिहास. तिन्ही धोका गुण हे त्या डेटावरून आणि निवडलेल्या पीक अवस्थेवरून ब्राउझरमध्ये मोजलेला एक पारदर्शक नियम-आधारित निर्देशांक आहेत, प्रशिक्षित मॉडेल नाही — हे बाजार आणि परिसंस्था इंटेलिजन्स वापरत असलेल्या त्याच नेक्सोरा एआय निर्णय इंजिनला डेटा पुरवते, आणि पीक-अवस्था व जिल्हा दिनदर्शिका वाढल्यावर हे सर्व्हर-साइड जाईल.",
+    wx:{clear:"निरभ्र आकाश",partlyCloudy:"अंशतः ढगाळ",cloudy:"ढगाळ",fog:"धुके",drizzle:"हलकी रिमझिम",rain:"पाऊस",heavyRain:"मुसळधार पाऊस",showers:"पावसाच्या सरी",thunder:"वादळी पाऊस",snow:"बर्फवृष्टी"}
+  },
+  pa: {
+    navBack:"ਹੋਮ 'ਤੇ ਵਾਪਸ ਜਾਓ", eyebrow:"ਜਲਵਾਯੂ ਇੰਟੈਲੀਜੈਂਸ", title:"ਬਦਲਾਅ ਤੋਂ ਪਹਿਲਾਂ ਅਸਮਾਨ ਨੂੰ ਸਮਝੋ।",
+    subtitle:"ਹੁਣੇ ਇਸ ਖੇਤ ਦੇ ਸਥਾਨ ਲਈ — ਲਾਈਵ ਪੂਰਵ ਅਨੁਮਾਨ, ਮਿੱਟੀ ਦੀ ਸਥਿਤੀ, ਅਤੇ ਫ਼ਸਲ ਜੋਖਮ।",
+    searchPlaceholder:"ਪਿੰਡ, ਤਹਿਸੀਲ ਜਾਂ ਸ਼ਹਿਰ ਖੋਜੋ…", searchBtn:"ਖੋਜੋ", useLocationBtn:"ਮੇਰਾ ਸਥਾਨ ਵਰਤੋ",
+    showingLabel:"ਵਿਖਾ ਰਹੇ ਹਾਂ:", loadingText:"ਲਾਈਵ ਮੌਸਮ ਲੋਡ ਹੋ ਰਿਹਾ ਹੈ…", detecting:"ਤੁਹਾਡਾ ਸਥਾਨ ਲੱਭਿਆ ਜਾ ਰਿਹਾ ਹੈ…",
+    errNoResults:"ਇਸ ਖੋਜ ਨਾਲ ਕੋਈ ਥਾਂ ਨਹੀਂ ਮਿਲੀ — ਨੇੜਲੇ ਸ਼ਹਿਰ ਜਾਂ ਜ਼ਿਲ੍ਹੇ ਨਾਲ ਖੋਜੋ।",
+    errGeo:"ਤੁਹਾਡਾ ਸਥਾਨ ਨਹੀਂ ਮਿਲ ਸਕਿਆ — ਇਸ ਦੀ ਬਜਾਏ ਥਾਂ ਦਾ ਨਾਮ ਖੋਜੋ।", errFetch:"ਲਾਈਵ ਮੌਸਮ ਡਾਟਾ ਲੋਡ ਨਹੀਂ ਹੋਇਆ — ਕਨੈਕਸ਼ਨ ਜਾਂਚੋ ਅਤੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+    feelsLike:"ਮਹਿਸੂਸ ਹੁੰਦਾ ਹੈ", humidity:"ਨਮੀ", wind:"ਹਵਾ", uvIndex:"UV ਇੰਡੈਕਸ",
+    updatedPrefix:"ਅੱਪਡੇਟ ਕੀਤਾ", forecastLabel:"7-ਦਿਨ ਪੂਰਵ ਅਨੁਮਾਨ",
+    rainChartTitle:"ਮੀਂਹ — ਪਿਛਲੇ 14 ਦਿਨ ਅਤੇ ਅਗਲੇ 7", rainChartSub:"ਰੋਜ਼ਾਨਾ ਵਰਖਾ। ਰੇਖਾ ਅੱਜ ਨੂੰ ਦਰਸਾਉਂਦੀ ਹੈ।",
+    tempChartTitle:"ਤਾਪਮਾਨ ਸੀਮਾ", tempChartSub:"ਅਗਲੇ 7 ਦਿਨਾਂ ਦਾ ਰੋਜ਼ਾਨਾ ਵੱਧ ਤੋਂ ਵੱਧ / ਘੱਟੋ-ਘੱਟ।",
+    legendHistorical:"ਦਰਜ", legendForecast:"ਪੂਰਵ ਅਨੁਮਾਨ", legendHigh:"ਵੱਧ ਤੋਂ ਵੱਧ", legendLow:"ਘੱਟੋ-ਘੱਟ",
+    riskLabel:"ਜਲਵਾਯੂ ਜੋਖਮ — ਅਗਲੇ 7 ਦਿਨ",
+    drought:"ਸੋਕੇ ਦਾ ਜੋਖਮ", flood:"ਹੜ੍ਹ / ਵਾਧੂ ਮੀਂਹ", heat:"ਗਰਮੀ ਦਾ ਦਬਾਅ",
+    sevLow:"ਘੱਟ", sevMod:"ਦਰਮਿਆਨਾ", sevHigh:"ਵੱਧ",
+    droughtDesc:"ਆਉਣ ਵਾਲੇ ਹਫ਼ਤੇ ਵਿੱਚ ਮੀਂਹ ਦੀ ਸਪਲਾਈ ਬਨਾਮ ਫ਼ਸਲ ਦੀ ਪਾਣੀ ਦੀ ਮੰਗ (ET₀)।",
+    floodDesc:"ਭਾਰੀ ਜਾਂ ਲਗਾਤਾਰ ਮੀਂਹ ਕਾਰਨ ਪਾਣੀ ਭਰਨ ਦੀ ਸੰਭਾਵਨਾ।",
+    heatDesc:"ਚੁਣੇ ਗਏ ਫ਼ਸਲ ਪੜਾਅ ਲਈ ਸੁਰੱਖਿਅਤ ਤਾਪਮਾਨ ਤੋਂ ਵੱਧ ਦਿਨ।",
+    agroLabel:"ਮਿੱਟੀ ਅਤੇ ਫ਼ਸਲ ਦੀ ਸਥਿਤੀ",
+    soilMoisture:"ਮਿੱਟੀ ਦੀ ਨਮੀ", soilMoistureNote:"ਉੱਪਰੀ ਪਰਤ (0–1 ਸੈਮੀ), ਲਾਈਵ ਅਨੁਮਾਨ।",
+    soilTemp:"ਮਿੱਟੀ ਦਾ ਤਾਪਮਾਨ", soilTempNote:"ਉਗਣ ਅਤੇ ਜੜ੍ਹਾਂ ਦੁਆਰਾ ਸੋਖਣ ਨੂੰ ਪ੍ਰਭਾਵਿਤ ਕਰਦਾ ਹੈ।",
+    et0:"ਫ਼ਸਲ ਪਾਣੀ ਦੀ ਮੰਗ", et0Note:"ਵਾਸ਼ਪ-ਉਤਸਰਜਨ — ਫ਼ਸਲ ਕਿੰਨੀ ਤੇਜ਼ੀ ਨਾਲ ਪਾਣੀ ਵਰਤ ਰਹੀ ਹੈ।",
+    cropStage:"ਫ਼ਸਲ ਪੜਾਅ", stageSowing:"ਬਿਜਾਈ", stageVegetative:"ਵਧਣ ਦੀ ਅਵਸਥਾ", stageFlowering:"ਫੁੱਲ ਆਉਣਾ", stageHarvest:"ਵਾਢੀ ਨੇੜੇ",
+    advisoryTitle:"ਅੱਜ ਦੀ ਸਲਾਹ",
+    adv:{
+      drought:{low:"ਹੁਣ ਲਈ ਪਾਣੀ ਦੀ ਸਪਲਾਈ ਠੀਕ ਲੱਗਦੀ ਹੈ — ਸਿੰਚਾਈ ਦੀ ਲੋੜ ਨਹੀਂ।", mod:"ਮੀਂਹ ਫ਼ਸਲ ਦੀ ਮੰਗ ਤੋਂ ਪਿੱਛੇ ਹੈ — ਅਗਲੇ 2–3 ਦਿਨਾਂ ਵਿੱਚ ਸਿੰਚਾਈ ਦੀ ਯੋਜਨਾ ਬਣਾਓ।", high:"ਅੱਗੇ ਵੱਡੀ ਪਾਣੀ ਦੀ ਘਾਟ ਦੀ ਸੰਭਾਵਨਾ ਹੈ — ਜਲਦੀ ਤੋਂ ਜਲਦੀ ਸਿੰਚਾਈ ਕਰੋ ਅਤੇ ਸਭ ਤੋਂ ਸੰਵੇਦਨਸ਼ੀਲ ਖੇਤਾਂ ਨੂੰ ਪਹਿਲ ਦਿਓ।"},
+      flood:{low:"ਇਸ ਹਫ਼ਤੇ ਵਾਧੂ ਮੀਂਹ ਦੀ ਚਿੰਤਾ ਨਹੀਂ।", mod:"ਦਰਮਿਆਨੇ ਭਾਰੀ ਮੀਂਹ ਦੀ ਸੰਭਾਵਨਾ — ਆਉਣ ਤੋਂ ਪਹਿਲਾਂ ਖੇਤ ਦੀਆਂ ਨਾਲੀਆਂ ਸਾਫ਼ ਕਰੋ।", high:"ਭਾਰੀ ਮੀਂਹ ਦਾ ਜੋਖਮ ਵੱਧ ਹੈ — ਹੁਣੇ ਨਾਲੀਆਂ ਸਾਫ਼ ਕਰੋ ਅਤੇ ਨਵੀਂ ਬਿਜਾਈ ਜਾਂ ਖਾਦ ਪਾਉਣਾ ਟਾਲੋ।"},
+      heat:{low:"ਇਸ ਫ਼ਸਲ ਪੜਾਅ ਲਈ ਤਾਪਮਾਨ ਸੁਰੱਖਿਅਤ ਸੀਮਾ ਵਿੱਚ ਰਹੇਗਾ।", mod:"ਅੱਗੇ ਕੁਝ ਗਰਮ ਦਿਨ ਹਨ — ਗਰਮੀ ਦਾ ਦਬਾਅ ਘਟਾਉਣ ਲਈ ਸਵੇਰੇ ਜਾਂ ਸ਼ਾਮ ਨੂੰ ਸਿੰਚਾਈ ਕਰੋ।", high:"ਇਸ ਫ਼ਸਲ ਪੜਾਅ ਲਈ ਲਗਾਤਾਰ ਗਰਮੀ ਦਾ ਦਬਾਅ ਅਨੁਮਾਨਿਤ ਹੈ — ਜੜ੍ਹ ਖੇਤਰ ਨੂੰ ਠੰਡਾ ਰੱਖਣ ਲਈ ਸਿੰਚਾਈ ਕਰੋ ਅਤੇ ਦੁਪਹਿਰ ਵੇਲੇ ਖੇਤ ਦਾ ਕੰਮ ਨਾ ਕਰੋ।"}
+    },
+    buildLabel:"ਬਿਲਡ ਨੋਟ",
+    buildText:"ਇਹ ਪੰਨਾ ਖੋਜੇ ਗਏ ਕਿਸੇ ਵੀ ਸਥਾਨ ਲਈ ਲਾਈਵ ਜਨਤਕ ਮੌਸਮ ਅਤੇ ਜਲਵਾਯੂ ਡਾਟਾ (Open-Meteo) 'ਤੇ ਚੱਲਦਾ ਹੈ — ਪੂਰਵ ਅਨੁਮਾਨ, ਮਿੱਟੀ ਦੀ ਨਮੀ, ਵਾਸ਼ਪ-ਉਤਸਰਜਨ, ਅਤੇ 14-ਦਿਨ ਦਾ ਮੀਂਹ ਇਤਿਹਾਸ। ਤਿੰਨੇ ਜੋਖਮ ਸਕੋਰ ਉਸ ਡਾਟੇ ਅਤੇ ਚੁਣੇ ਫ਼ਸਲ ਪੜਾਅ ਤੋਂ ਬ੍ਰਾਊਜ਼ਰ ਵਿੱਚ ਗਿਣਿਆ ਗਿਆ ਇੱਕ ਪਾਰਦਰਸ਼ੀ ਨਿਯਮ-ਆਧਾਰਿਤ ਸੂਚਕ ਅੰਕ ਹਨ, ਸਿਖਲਾਈ-ਪ੍ਰਾਪਤ ਮਾਡਲ ਨਹੀਂ — ਇਹ ਉਸੇ ਨੈਕਸੋਰਾ AI ਫੈਸਲਾ ਇੰਜਣ ਨੂੰ ਡਾਟਾ ਦਿੰਦਾ ਹੈ ਜੋ ਮਾਰਕੀਟ ਅਤੇ ਈਕੋਸਿਸਟਮ ਇੰਟੈਲੀਜੈਂਸ ਵਰਤਦੇ ਹਨ, ਅਤੇ ਫ਼ਸਲ-ਪੜਾਅ ਤੇ ਜ਼ਿਲ੍ਹਾ ਕੈਲੰਡਰ ਵਧਣ ਨਾਲ ਇਹ ਸਰਵਰ-ਸਾਈਡ ਚਲਾ ਜਾਵੇਗਾ।",
+    wx:{clear:"ਸਾਫ਼ ਅਸਮਾਨ",partlyCloudy:"ਅੰਸ਼ਕ ਬੱਦਲ",cloudy:"ਬੱਦਲਵਾਈ",fog:"ਧੁੰਦ",drizzle:"ਹਲਕੀ ਬੂੰਦਾ-ਬਾਂਦੀ",rain:"ਮੀਂਹ",heavyRain:"ਭਾਰੀ ਮੀਂਹ",showers:"ਮੀਂਹ ਦੀਆਂ ਬੌਛਾਰਾਂ",thunder:"ਗਰਜ-ਤੂਫ਼ਾਨ",snow:"ਬਰਫ਼ਬਾਰੀ"}
+  }
+};
+const LOCALE_MAP = {en:'en-IN', hi:'hi-IN', mr:'mr-IN', pa:'pa-IN'};
+
+/* ============================= STATE ============================= */
+let currentLang = 'en';
+let cropStage = 'vegetative';
+let lastData = null;         // cached API payload so language switches don't refetch
+let lastPlace = {name:"Nashik, Maharashtra", lat:19.9975, lon:73.7898};
+
+/* ============================= WEATHER CODE → ICON/TEXT KEY ============================= */
+function wxKey(code){
+  if (code === 0) return 'clear';
+  if ([1,2].includes(code)) return 'partlyCloudy';
+  if (code === 3) return 'cloudy';
+  if ([45,48].includes(code)) return 'fog';
+  if ([51,53,55,56,57].includes(code)) return 'drizzle';
+  if ([61,63,66].includes(code)) return 'rain';
+  if ([65,67,82].includes(code)) return 'heavyRain';
+  if ([80,81].includes(code)) return 'showers';
+  if ([71,73,75,77,85,86].includes(code)) return 'snow';
+  if ([95,96,99].includes(code)) return 'thunder';
+  return 'cloudy';
+}
+function wxIcon(key, size){
+  const c = {sun:'var(--gold)', cloud:'#9CB4AC', cloudLight:'#C7DAD3', rain:'var(--blue)', bolt:'var(--blue-deep)'};
+  const svgs = {
+    clear:`<circle cx="32" cy="32" r="14" fill="${c.sun}"/>${[0,45,90,135,180,225,270,315].map(a=>`<line x1="0" y1="-22" x2="0" y2="-30" transform="translate(32 32) rotate(${a})" stroke="${c.sun}" stroke-width="3" stroke-linecap="round"/>`).join('')}`,
+    partlyCloudy:`<circle cx="24" cy="26" r="11" fill="${c.sun}"/><ellipse cx="38" cy="38" rx="18" ry="12" fill="${c.cloud}"/>`,
+    cloudy:`<ellipse cx="26" cy="32" rx="15" ry="10" fill="${c.cloudLight}"/><ellipse cx="40" cy="36" rx="18" ry="12" fill="${c.cloud}"/>`,
+    fog:`<ellipse cx="32" cy="26" rx="16" ry="9" fill="${c.cloudLight}"/>${[34,42,50].map(y=>`<line x1="12" y1="${y}" x2="52" y2="${y}" stroke="${c.cloud}" stroke-width="3" stroke-linecap="round"/>`).join('')}`,
+    drizzle:`<ellipse cx="32" cy="26" rx="17" ry="11" fill="${c.cloud}"/>${[24,34,44].map(x=>`<line x1="${x}" y1="42" x2="${x-3}" y2="50" stroke="${c.rain}" stroke-width="2.5" stroke-linecap="round"/>`).join('')}`,
+    rain:`<ellipse cx="32" cy="24" rx="18" ry="11" fill="${c.cloud}"/>${[20,30,40,50].map(x=>`<line x1="${x}" y1="40" x2="${x-4}" y2="52" stroke="${c.rain}" stroke-width="3" stroke-linecap="round"/>`).join('')}`,
+    heavyRain:`<ellipse cx="32" cy="22" rx="19" ry="12" fill="#7C93A0"/>${[16,25,34,43,52].map(x=>`<line x1="${x}" y1="38" x2="${x-5}" y2="54" stroke="${c.rain}" stroke-width="3.5" stroke-linecap="round"/>`).join('')}`,
+    showers:`<circle cx="22" cy="24" r="9" fill="${c.sun}"/><ellipse cx="36" cy="30" rx="16" ry="10" fill="${c.cloud}"/>${[26,36,46].map(x=>`<line x1="${x}" y1="42" x2="${x-4}" y2="52" stroke="${c.rain}" stroke-width="3" stroke-linecap="round"/>`).join('')}`,
+    thunder:`<ellipse cx="32" cy="22" rx="18" ry="11" fill="#6B7F8C"/><polygon points="34,36 26,50 32,50 28,60 42,42 34,42" fill="${c.bolt}"/>`,
+    snow:`<ellipse cx="32" cy="24" rx="17" ry="11" fill="${c.cloudLight}"/>${[22,32,42].map(x=>`<circle cx="${x}" cy="48" r="2.4" fill="#B9D8EF"/>`).join('')}`
+  };
+  return svgs[key] || svgs.cloudy;
+}
+
+/* ============================= GEOCODING & WEATHER FETCH ============================= */
+async function geocode(query, lang){
+  const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=6&language=${lang==='en'?'en':'en'}&format=json&countryCode=IN`;
+  const res = await fetch(url);
+  if(!res.ok) throw new Error('geocode failed');
+  const json = await res.json();
+  return json.results || [];
+}
+async function reverseByCoords(lat, lon){
+  // Open-Meteo geocoding has no reverse endpoint; label with coordinates, refined if a search result matches later.
+  return `${lat.toFixed(2)}°, ${lon.toFixed(2)}°`;
+}
+async function fetchWeather(lat, lon){
+  const fUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}`
+    + `&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m,uv_index`
+    + `&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,et0_fao_evapotranspiration,uv_index_max`
+    + `&hourly=soil_moisture_0_to_1cm,soil_temperature_0cm`
+    + `&forecast_days=7&timezone=auto`;
+  const hEnd = new Date(); hEnd.setDate(hEnd.getDate()-1);
+  const hStart = new Date(); hStart.setDate(hStart.getDate()-14);
+  const fmt = d => d.toISOString().slice(0,10);
+  const aUrl = `https://archive-api.open-meteo.com/v1/archive?latitude=${lat}&longitude=${lon}`
+    + `&start_date=${fmt(hStart)}&end_date=${fmt(hEnd)}&daily=precipitation_sum&timezone=auto`;
+  const [fRes, aRes] = await Promise.all([fetch(fUrl), fetch(aUrl)]);
+  if(!fRes.ok) throw new Error('forecast failed');
+  const forecast = await fRes.json();
+  let archive = null;
+  try { if(aRes.ok) archive = await aRes.json(); } catch(e){ archive = null; }
+  return {forecast, archive};
+}
+
+/* ============================= RISK ENGINE (transparent, rule-based) ============================= */
+const STAGE_HEAT_THRESHOLD = {sowing:35, vegetative:38, flowering:33, harvest:40};
+function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
+
+function computeRisks(data, stage){
+  const d = data.forecast.daily;
+  const next7Rain = (d.precipitation_sum||[]).reduce((a,b)=>a+(b||0),0);
+  const maxDailyRain = Math.max(...(d.precipitation_sum||[0]));
+  const maxProb = Math.max(...(d.precipitation_probability_max||[0]));
+  const et0Sum = (d.et0_fao_evapotranspiration||[]).reduce((a,b)=>a+(b||0),0);
+  let past14Rain = 0;
+  if (data.archive && data.archive.daily && data.archive.daily.precipitation_sum){
+    past14Rain = data.archive.daily.precipitation_sum.reduce((a,b)=>a+(b||0),0);
+  }
+  const soilArr = (data.forecast.hourly && data.forecast.hourly.soil_moisture_0_to_1cm) || [];
+  const avgSoil = soilArr.length ? soilArr.reduce((a,b)=>a+(b||0),0)/soilArr.length : 0.2;
+
+  // Drought: demand (ET0) vs weighted rainfall supply, adjusted by soil moisture
+  const rainSupply = past14Rain*0.35 + next7Rain*0.9;
+  const deficit = et0Sum - rainSupply;
+  let droughtScore = clamp(50 + deficit*4, 0, 100);
+  if (avgSoil < 0.15) droughtScore += 15;
+  if (avgSoil < 0.08) droughtScore += 15;
+  droughtScore = clamp(droughtScore, 0, 100);
+
+  // Flood: 7-day total + single-day intensity + rain probability
+  let floodScore = clamp((next7Rain/140)*55 + (maxDailyRain/70)*35, 0, 100);
+  if (maxProb > 80 && maxDailyRain > 30) floodScore = clamp(floodScore+15, 0, 100);
+
+  // Heat: days over the crop-stage-specific safe threshold
+  const threshold = STAGE_HEAT_THRESHOLD[stage] || 37;
+  const tmax = d.temperature_2m_max || [];
+  const overDays = tmax.filter(t=>t>threshold).length;
+  const avgOverBy = tmax.length ? (tmax.reduce((a,b)=>a+b,0)/tmax.length) - threshold : 0;
+  let heatScore = clamp((overDays/7)*80 + Math.max(0,avgOverBy)*4, 0, 100);
+
+  const lvl = s => s<35?'low':(s<65?'mod':'high');
+  return {
+    drought:{score:Math.round(droughtScore), level:lvl(droughtScore)},
+    flood:{score:Math.round(floodScore), level:lvl(floodScore)},
+    heat:{score:Math.round(heatScore), level:lvl(heatScore), threshold},
+    stats:{next7Rain, past14Rain, et0Sum, avgSoil, maxDailyRain}
+  };
+}
+
+/* ============================= RENDER ============================= */
+function fmtNum(n, d=1){ return (n===undefined||n===null||isNaN(n)) ? '--' : Number(n).toFixed(d); }
+
+function renderCurrent(t){
+  const cur = lastData.forecast.current;
+  const key = wxKey(cur.weather_code);
+  document.getElementById('now-icon').innerHTML = wxIcon(key);
+  document.getElementById('now-temp').textContent = Math.round(cur.temperature_2m);
+  document.getElementById('now-cond').textContent = t.wx[key];
+  document.getElementById('now-place').textContent = lastPlace.name;
+  document.getElementById('stat-feels').textContent = Math.round(cur.apparent_temperature)+'°';
+  document.getElementById('stat-humidity').textContent = Math.round(cur.relative_humidity_2m)+'%';
+  document.getElementById('stat-wind').textContent = Math.round(cur.wind_speed_10m)+' km/h';
+  document.getElementById('stat-uv').textContent = fmtNum(cur.uv_index,1);
+  document.getElementById('updated-tag').textContent = t.updatedPrefix+' '+new Date().toLocaleTimeString(LOCALE_MAP[currentLang],{hour:'2-digit',minute:'2-digit'});
+  const rainy = ['drizzle','rain','heavyRain','showers','thunder'].includes(key);
+  document.getElementById('rain-layer').classList.toggle('show', rainy);
+}
+
+function renderForecastStrip(t){
+  const d = lastData.forecast.daily;
+  const wrap = document.getElementById('forecast-strip');
+  wrap.innerHTML = '';
+  d.time.forEach((iso,i)=>{
+    const date = new Date(iso+'T00:00:00');
+    const dayName = date.toLocaleDateString(LOCALE_MAP[currentLang], {weekday:'short'});
+    const key = wxKey(d.weather_code[i]);
+    const el = document.createElement('div');
+    el.className='fday';
+    el.innerHTML = `<div class="d">${i===0? '•' : dayName}</div>
+      <svg viewBox="0 0 64 64">${wxIcon(key)}</svg>
+      <div class="hi">${Math.round(d.temperature_2m_max[i])}°</div>
+      <div class="lo">${Math.round(d.temperature_2m_min[i])}°</div>
+      <div class="rain">💧 ${Math.round(d.precipitation_probability_max[i]||0)}%</div>`;
+    wrap.appendChild(el);
+  });
+}
+
+function renderRainChart(t){
+  const svg = document.getElementById('rain-chart');
+  const histDaily = (lastData.archive && lastData.archive.daily) ? lastData.archive.daily : {time:[],precipitation_sum:[]};
+  const foreDaily = lastData.forecast.daily;
+  const histVals = histDaily.precipitation_sum || [];
+  const foreVals = foreDaily.precipitation_sum || [];
+  const all = [...histVals, ...foreVals];
+  const max = Math.max(4, ...all.map(v=>v||0));
+  const W=640,H=200,pad=8, n=all.length, bw = (W-pad*2)/n * 0.68, gap=(W-pad*2)/n;
+  let bars = '';
+  all.forEach((v,i)=>{
+    const isHist = i < histVals.length;
+    const h = ((v||0)/max)*(H-40);
+    const x = pad + i*gap + (gap-bw)/2;
+    const y = H-30-h;
+    bars += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" rx="2" fill="${isHist?'var(--blue-deep)':'var(--blue)'}" opacity="${isHist?1:0.55}"><title>${(v||0).toFixed(1)} mm</title></rect>`;
+  });
+  const todayX = pad + histVals.length*gap;
+  svg.innerHTML = `${bars}<line x1="${todayX.toFixed(1)}" y1="6" x2="${todayX.toFixed(1)}" y2="${H-30}" stroke="var(--leaf-deep)" stroke-width="1.5" stroke-dasharray="3,3"/>
+    <line x1="${pad}" y1="${H-30}" x2="${W-pad}" y2="${H-30}" stroke="var(--line)" stroke-width="1"/>`;
+}
+
+function renderTempChart(t){
+  const svg = document.getElementById('temp-chart');
+  const d = lastData.forecast.daily;
+  const hi = d.temperature_2m_max, lo = d.temperature_2m_min;
+  const all = [...hi, ...lo];
+  const max = Math.max(...all), min = Math.min(...all);
+  const W=320,H=200,padL=26,padR=10,padT=14,padB=26;
+  const n = hi.length;
+  const xStep = (W-padL-padR)/(n-1);
+  const yFor = v => padT + (1-( (v-min)/((max-min)||1) ))*(H-padT-padB);
+  const pts = arr => arr.map((v,i)=>`${(padL+i*xStep).toFixed(1)},${yFor(v).toFixed(1)}`).join(' ');
+  const areaPts = `${padL},${yFor(min).toFixed(1)} ${pts(hi)} ${(padL+(n-1)*xStep).toFixed(1)},${yFor(min).toFixed(1)}`;
+  let dots='';
+  hi.forEach((v,i)=>{ dots+=`<circle cx="${(padL+i*xStep).toFixed(1)}" cy="${yFor(v).toFixed(1)}" r="3" fill="var(--gold)"/>`; });
+  lo.forEach((v,i)=>{ dots+=`<circle cx="${(padL+i*xStep).toFixed(1)}" cy="${yFor(v).toFixed(1)}" r="3" fill="var(--blue)"/>`; });
+  svg.innerHTML = `
+    <polygon points="${areaPts}" fill="var(--gold)" opacity="0.12"/>
+    <polyline points="${pts(hi)}" fill="none" stroke="var(--gold)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <polyline points="${pts(lo)}" fill="none" stroke="var(--blue)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    ${dots}
+    <line x1="${padL}" y1="${H-padB}" x2="${W-padR}" y2="${H-padB}" stroke="var(--line)" stroke-width="1"/>
+    <text x="${padL}" y="12" font-size="9" fill="var(--text-muted)" font-family="DM Mono, monospace">${Math.round(max)}°</text>
+    <text x="${padL}" y="${H-padB+18}" font-size="9" fill="var(--text-muted)" font-family="DM Mono, monospace">${Math.round(min)}°</text>`;
+}
+
+function ringColor(level){ return level==='low' ? 'var(--leaf)' : (level==='mod' ? 'var(--gold)' : 'var(--danger)'); }
+function sevClass(level){ return level==='low'?'sev-low':(level==='mod'?'sev-mod':'sev-high'); }
+
+function renderRisk(t, risks){
+  const wrap = document.getElementById('risk-row');
+  const items = [
+    {key:'drought', title:t.drought, desc:t.droughtDesc, r:risks.drought},
+    {key:'flood', title:t.flood, desc:t.floodDesc, r:risks.flood},
+    {key:'heat', title:t.heat, desc:t.heatDesc, r:risks.heat}
+  ];
+  const circ = 2*Math.PI*36;
+  wrap.innerHTML = items.map(it=>{
+    const offset = circ - (it.r.score/100)*circ;
+    const sevText = it.r.level==='low'?t.sevLow:(it.r.level==='mod'?t.sevMod:t.sevHigh);
+    return `<div class="risk-card">
+      <div class="ring-wrap">
+        <svg width="86" height="86" viewBox="0 0 86 86">
+          <circle class="ring-bg" cx="43" cy="43" r="36"/>
+          <circle class="ring-fg" cx="43" cy="43" r="36" stroke="${ringColor(it.r.level)}" stroke-dasharray="${circ.toFixed(1)}" stroke-dashoffset="${offset.toFixed(1)}"/>
+        </svg>
+        <div class="ring-label">${it.r.score}</div>
+      </div>
+      <div class="risk-body">
+        <div class="rt">${it.title}</div>
+        <div class="rl ${sevClass(it.r.level)}">${sevText}</div>
+        <div class="rd">${it.desc}</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  // advisory — pick the single most urgent risk to headline
+  const order = ['high','mod','low'];
+  let top = items[0];
+  for (const lvl of order){ const f = items.find(x=>x.r.level===lvl); if(f){ top=f; break; } }
+  const advWrap = document.getElementById('advisory-wrap');
+  const cls = top.r.level==='low'?'low':(top.r.level==='mod'?'mod':'high');
+  const icon = cls==='high'
+    ? `<svg viewBox="0 0 24 24" fill="none" stroke="var(--danger-deep)" stroke-width="2"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg>`
+    : `<svg viewBox="0 0 24 24" fill="none" stroke="${cls==='mod'?'var(--gold-deep)':'var(--leaf-deep)'}" stroke-width="2"><path d="M12 2v4M12 18v4M4.9 4.9l2.8 2.8M16.3 16.3l2.8 2.8M2 12h4M18 12h4M4.9 19.1l2.8-2.8M16.3 7.7l2.8-2.8"/><circle cx="12" cy="12" r="4"/></svg>`;
+  advWrap.innerHTML = `<div class="advisory ${cls}">${icon}<div><div class="at">${t.advisoryTitle}</div><div class="ab">${t.adv[top.key][cls]}</div></div></div>`;
+}
+
+function renderAgro(t, risks){
+  const d = lastData.forecast.daily;
+  const stats = risks.stats;
+  const et0Avg = stats.et0Sum/7;
+  const soilTempArr = (lastData.forecast.hourly && lastData.forecast.hourly.soil_temperature_0cm) || [];
+  const avgSoilTemp = soilTempArr.length ? soilTempArr.reduce((a,b)=>a+(b||0),0)/soilTempArr.length : null;
+  const wrap = document.getElementById('agro-row');
+  wrap.innerHTML = `
+    <div class="agro-tile">
+      <div class="k">${t.soilMoisture}</div>
+      <div class="v">${fmtNum(stats.avgSoil*100,0)}<span class="u">%</span></div>
+      <div class="note">${t.soilMoistureNote}</div>
+    </div>
+    <div class="agro-tile">
+      <div class="k">${t.soilTemp}</div>
+      <div class="v">${avgSoilTemp!==null?fmtNum(avgSoilTemp,1):'--'}<span class="u">°C</span></div>
+      <div class="note">${t.soilTempNote}</div>
+    </div>
+    <div class="agro-tile">
+      <div class="k">${t.et0}</div>
+      <div class="v">${fmtNum(et0Avg,1)}<span class="u">mm/day</span></div>
+      <div class="note">${t.et0Note}</div>
+    </div>
+    <div class="agro-tile">
+      <div class="k">${t.cropStage}</div>
+      <select class="stage-select" id="stage-select">
+        <option value="sowing">${t.stageSowing}</option>
+        <option value="vegetative">${t.stageVegetative}</option>
+        <option value="flowering">${t.stageFlowering}</option>
+        <option value="harvest">${t.stageHarvest}</option>
+      </select>
+      <div class="note">${Math.round(STAGE_HEAT_THRESHOLD[cropStage])}°C+ = ${t.heat.toLowerCase()}</div>
+    </div>`;
+  document.getElementById('stage-select').value = cropStage;
+  document.getElementById('stage-select').addEventListener('change', (e)=>{
+    cropStage = e.target.value;
+    renderAll();
+  });
+}
+
+function renderAll(){
+  if(!lastData) return;
+  const t = I18N[currentLang];
+  document.getElementById('html-root').setAttribute('lang', currentLang);
+  document.querySelectorAll('[data-i18n]').forEach(el=>{ const k=el.getAttribute('data-i18n'); if(t[k]) el.textContent=t[k]; });
+  document.querySelectorAll('[data-i18n-ph]').forEach(el=>{ const k=el.getAttribute('data-i18n-ph'); if(t[k]) el.setAttribute('placeholder', t[k]); });
+  document.getElementById('back-link').setAttribute('href','nexora-first-page.html?lang='+currentLang);
+  const risks = computeRisks(lastData, cropStage);
+  renderCurrent(t);
+  renderForecastStrip(t);
+  renderRainChart(t);
+  renderTempChart(t);
+  renderRisk(t, risks);
+  renderAgro(t, risks);
+}
+
+/* ============================= LOAD / EVENTS ============================= */
+async function loadPlace(lat, lon, name){
+  const banner = document.getElementById('status-banner');
+  banner.className=''; banner.textContent = I18N[currentLang].loadingText;
+  document.getElementById('now-cond').textContent = I18N[currentLang].loadingText;
+  try{
+    const data = await fetchWeather(lat, lon);
+    lastData = data;
+    lastPlace = {name, lat, lon};
+    document.getElementById('loc-name').textContent = name;
+    banner.textContent='';
+    renderAll();
+  }catch(err){
+    banner.className='err';
+    banner.textContent = I18N[currentLang].errFetch;
+  }
+}
+
+function wireLangPills(){
+  document.querySelectorAll('.lang-pill').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      currentLang = btn.dataset.lang;
+      document.querySelectorAll('.lang-pill').forEach(p=>p.classList.toggle('active', p===btn));
+      renderAll();
+    });
+  });
+}
+
+function wireSearch(){
+  const input = document.getElementById('loc-input');
+  const list = document.getElementById('suggest-list');
+  let debounce;
+  input.addEventListener('input', ()=>{
+    clearTimeout(debounce);
+    const q = input.value.trim();
+    if(q.length<3){ list.classList.remove('show'); return; }
+    debounce = setTimeout(async ()=>{
+      try{
+        const results = await geocode(q, currentLang);
+        if(!results.length){ list.classList.remove('show'); return; }
+        list.innerHTML = results.map(r=>`<div class="suggest-item" data-lat="${r.latitude}" data-lon="${r.longitude}" data-name="${(r.name+(r.admin1?', '+r.admin1:''))}">${r.name}${r.admin1?', '+r.admin1:''}</div>`).join('');
+        list.classList.add('show');
+      }catch(e){ list.classList.remove('show'); }
+    }, 350);
+  });
+  list.addEventListener('click', (e)=>{
+    const item = e.target.closest('.suggest-item');
+    if(!item) return;
+    list.classList.remove('show');
+    input.value = item.dataset.name;
+    loadPlace(parseFloat(item.dataset.lat), parseFloat(item.dataset.lon), item.dataset.name);
+  });
+  document.getElementById('loc-form').addEventListener('submit', async (e)=>{
+    e.preventDefault();
+    const q = input.value.trim();
+    if(!q) return;
+    const banner = document.getElementById('status-banner');
+    try{
+      const results = await geocode(q, currentLang);
+      if(!results.length){ banner.className='err'; banner.textContent = I18N[currentLang].errNoResults; return; }
+      const r = results[0];
+      const name = r.name+(r.admin1?', '+r.admin1:'');
+      list.classList.remove('show');
+      loadPlace(r.latitude, r.longitude, name);
+    }catch(err){ banner.className='err'; banner.textContent = I18N[currentLang].errFetch; }
+  });
+  document.addEventListener('click', (e)=>{ if(!e.target.closest('#geo-suggest')) list.classList.remove('show'); });
+}
+
+function wireGeoBtn(){
+  document.getElementById('geo-btn').addEventListener('click', ()=>{
+    const banner = document.getElementById('status-banner');
+    if(!navigator.geolocation){ banner.className='err'; banner.textContent = I18N[currentLang].errGeo; return; }
+    banner.className=''; banner.textContent = I18N[currentLang].detecting;
+    navigator.geolocation.getCurrentPosition(async (pos)=>{
+      const {latitude, longitude} = pos.coords;
+      const label = await reverseByCoords(latitude, longitude);
+      loadPlace(latitude, longitude, label);
+    }, ()=>{ banner.className='err'; banner.textContent = I18N[currentLang].errGeo; }, {timeout:8000});
+  });
+}
+
+// ambient sky: a few drifting clouds + rain drops, built once
+(function initSky(){
+  const stage = document.getElementById('sky-stage');
+  for(let i=0;i<4;i++){
+    const cl = document.createElement('div');
+    cl.className='sky-cloud';
+    const s = 60+Math.random()*70;
+    cl.style.top = (5+Math.random()*30)+'%';
+    cl.style.width = s+'px'; cl.style.height = (s*0.55)+'px';
+    cl.style.background = 'radial-gradient(ellipse at center, rgba(255,255,255,.9), rgba(220,235,230,.5))';
+    cl.style.borderRadius = '50%';
+    cl.style.animationDuration = (40+Math.random()*30)+'s';
+    cl.style.animationDelay = (-Math.random()*40)+'s';
+    stage.appendChild(cl);
+  }
+  const rainLayer = document.getElementById('rain-layer');
+  for(let i=0;i<40;i++){
+    const dr = document.createElement('div');
+    dr.className='drop';
+    dr.style.left = Math.random()*100+'%';
+    dr.style.animationDuration = (0.6+Math.random()*0.6)+'s';
+    dr.style.animationDelay = (Math.random()*1)+'s';
+    rainLayer.appendChild(dr);
+  }
+})();
+
+wireLangPills();
+wireSearch();
+wireGeoBtn();
+
+const params = new URLSearchParams(location.search);
+const startLang = params.get('lang');
+if (startLang && I18N[startLang]) currentLang = startLang;
+document.querySelectorAll('.lang-pill').forEach(p=>p.classList.toggle('active', p.dataset.lang===currentLang));
+
+loadPlace(lastPlace.lat, lastPlace.lon, lastPlace.name);
+</script>
+</body>
+</html>

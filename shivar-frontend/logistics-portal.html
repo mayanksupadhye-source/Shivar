@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Shivar Logistics — Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+<style>
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --sky: #F0F9FF; --meadow: #F0FDF4; --field: #DCFCE7;
+    --leaf: #15803D; --leaf-deep: #14532D; --lime: #22C55E;
+    --blue: #2563EB; --blue-deep: #1E3A8A; --gold: #FF9933;
+    --cream: #ffffff; --sand: #F8FAFC;
+    --text-main: #17352A; --text-muted: #526B61;
+    --line: rgba(20, 83, 45,0.16); --card: rgba(255,255,255,0.82);
+  }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: linear-gradient(180deg, var(--meadow) 0%, var(--sky) 45%, var(--meadow) 100%);
+    color: var(--text-main);
+    min-height: 100vh;
+  }
+
+  nav {
+    position: sticky; top: 0; z-index: 50;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 1rem 2.5rem;
+    background: rgba(255,255,255,0.82);
+    backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--line);
+  }
+  .nav-logo { font-family: 'Playfair Display', serif; font-size: 1.4rem; font-weight: 900; color: var(--leaf-deep); }
+  .nav-logo span { color: var(--blue-deep); }
+  .nav-right { display: flex; align-items: center; gap: 1rem; }
+  .nav-tag { font-size: 0.8rem; font-weight: 600; color: var(--blue-deep); background: rgba(37,99,235,0.1); padding: 0.35rem 0.9rem; border-radius: 100px; }
+  #logoutBtn { background: none; border: 1.5px solid rgba(220,38,38,0.3); color: #b91c1c; padding: 0.5rem 1rem; border-radius: 8px; cursor: pointer; font-size: 0.85rem; font-weight: 600; }
+
+  main { padding: 2rem 2.5rem; max-width: 1200px; margin: 0 auto; }
+
+  h1 { font-family: 'Playfair Display', serif; font-size: 1.8rem; font-weight: 900; color: var(--leaf-deep); margin-bottom: 0.3rem; }
+  .subtitle { color: var(--text-muted); margin-bottom: 1.5rem; font-size: 0.9rem; }
+
+  .toolbar { display: flex; gap: 0.8rem; flex-wrap: wrap; margin-bottom: 1.2rem; align-items: center; }
+  .toolbar select, .toolbar input {
+    font-family: 'DM Sans', sans-serif; padding: 0.6rem 0.9rem; border-radius: 8px;
+    border: 1.5px solid var(--line); background: #fff; font-size: 0.88rem;
+  }
+  .sort-toggle { display: flex; border: 1.5px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .sort-toggle button {
+    padding: 0.6rem 1rem; border: none; background: #fff; cursor: pointer;
+    font-size: 0.85rem; font-weight: 600; color: var(--text-muted);
+  }
+  .sort-toggle button.active { background: var(--leaf); color: #fff; }
+
+  .tx-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px,1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+  .tx-card {
+    background: var(--card); border: 1px solid var(--line); border-radius: 14px;
+    padding: 1.2rem; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s;
+  }
+  .tx-card:hover { transform: translateY(-3px); box-shadow: 0 14px 30px rgba(30,58,138,0.12); border-color: rgba(21,128,61,0.35); }
+  .tx-card .crop { font-family: 'Playfair Display', serif; font-weight: 700; font-size: 1.1rem; color: var(--leaf-deep); }
+  .tx-card .variety { font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.6rem; }
+  .tx-card .row { display: flex; justify-content: space-between; font-size: 0.82rem; color: var(--text-muted); margin-top: 0.3rem; }
+  .tx-card .route { font-size: 0.78rem; color: var(--text-main); margin-top: 0.6rem; line-height: 1.4; }
+  .tx-card .distance-badge {
+    display: inline-block; margin-top: 0.6rem; font-size: 0.78rem; font-weight: 700;
+    color: var(--leaf-deep); background: var(--field); padding: 0.2rem 0.6rem; border-radius: 100px;
+  }
+
+  .pager { display: flex; gap: 0.6rem; justify-content: center; align-items: center; margin-bottom: 3rem; }
+  .pager button {
+    padding: 0.5rem 1rem; border-radius: 8px; border: 1.5px solid var(--line);
+    background: #fff; cursor: pointer; font-weight: 600; font-size: 0.85rem;
+  }
+  .pager button:disabled { opacity: 0.4; cursor: not-allowed; }
+  .pager span { font-size: 0.85rem; color: var(--text-muted); }
+
+  /* ── Modal ── */
+  .overlay {
+    display: none; position: fixed; inset: 0; background: rgba(15,40,24,0.55);
+    z-index: 200; align-items: center; justify-content: center; padding: 1.5rem;
+  }
+  .overlay.open { display: flex; }
+  .modal {
+    background: #fff; border-radius: 16px; max-width: 720px; width: 100%;
+    max-height: 90vh; overflow-y: auto; padding: 1.8rem;
+    box-shadow: 0 30px 80px rgba(15,40,24,0.3);
+  }
+  .modal-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem; }
+  .modal-header h2 { font-family: 'Playfair Display', serif; color: var(--leaf-deep); font-size: 1.4rem; }
+  .modal-close { background: none; border: none; font-size: 1.3rem; cursor: pointer; color: var(--text-muted); }
+
+  #map { height: 280px; border-radius: 12px; margin: 1rem 0; border: 1px solid var(--line); }
+
+  .distance-summary { display: flex; gap: 1.5rem; margin-bottom: 1rem; flex-wrap: wrap; }
+  .distance-summary .stat { background: var(--sand); border-radius: 10px; padding: 0.8rem 1.1rem; flex: 1; min-width: 140px; }
+  .distance-summary .stat .label { font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.2rem; }
+  .distance-summary .stat .value { font-size: 1.2rem; font-weight: 700; color: var(--leaf-deep); }
+
+  table.vehicle-table { width: 100%; border-collapse: collapse; margin-bottom: 1rem; font-size: 0.85rem; }
+  table.vehicle-table th, table.vehicle-table td { text-align: left; padding: 0.55rem 0.6rem; border-bottom: 1px solid var(--line); }
+  table.vehicle-table th { color: var(--text-muted); font-weight: 600; font-size: 0.78rem; }
+  table.vehicle-table tr.owned { background: var(--field); }
+  table.vehicle-table tr.owned td:first-child::before { content: '✓ '; color: var(--leaf); font-weight: 700; }
+
+  .chat-actions { display: flex; gap: 0.7rem; margin-top: 0.5rem; }
+  .btn-secondary {
+    border: 1.5px solid rgba(21, 128, 61,0.4); color: var(--leaf-deep);
+    background: rgba(255,255,255,0.6); padding: 0.6rem 1.2rem; border-radius: 8px;
+    font-weight: 600; font-size: 0.85rem; cursor: pointer;
+  }
+
+  /* ── Chat drawer ── */
+  #chatDrawer {
+    display: none; position: fixed; right: 0; top: 0; bottom: 0; width: 360px;
+    background: #fff; border-left: 1px solid var(--line); z-index: 300;
+    flex-direction: column; box-shadow: -12px 0 40px rgba(15,40,24,0.15);
+  }
+  #chatDrawer.open { display: flex; }
+  .chat-header { padding: 1rem; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center; }
+  .chat-header strong { color: var(--leaf-deep); font-size: 0.95rem; }
+  #chatCloseBtn { background: none; border: none; cursor: pointer; font-size: 1.2rem; color: var(--text-muted); }
+  #chatMessages { flex: 1; overflow-y: auto; padding: 1rem; display: flex; flex-direction: column; gap: 0.6rem; }
+  .bubble { max-width: 80%; padding: 0.55rem 0.8rem; border-radius: 12px; font-size: 0.85rem; line-height: 1.4; }
+  .bubble.mine { align-self: flex-end; background: var(--leaf); color: #fff; border-bottom-right-radius: 3px; }
+  .bubble.theirs { align-self: flex-start; background: var(--sand); color: var(--text-main); border-bottom-left-radius: 3px; }
+  #chatInputRow { display: flex; gap: 0.5rem; padding: 0.8rem; border-top: 1px solid var(--line); }
+  #chatInputRow input { flex: 1; padding: 0.6rem 0.8rem; border-radius: 8px; border: 1.5px solid var(--line); font-family: 'DM Sans', sans-serif; }
+  #chatInputRow button { background: var(--leaf); color: #fff; border: none; border-radius: 8px; padding: 0 1rem; cursor: pointer; font-weight: 600; }
+
+  .empty-state { text-align: center; padding: 3rem 1rem; color: var(--text-muted); }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-logo">Shiv<span>ar</span> <small style="font-size:0.75rem; font-weight:600; color:var(--text-muted);">Logistics</small></div>
+  <div class="nav-right">
+    <span class="nav-tag" id="partnerBadge">🚚 Partner</span>
+    <button id="logoutBtn">Log out</button>
+  </div>
+</nav>
+
+<main>
+  <h1>Transaction Board</h1>
+  <p class="subtitle">Browse completed farmer↔buyer transactions and pick up deliveries near you.</p>
+
+  <div class="toolbar">
+    <div class="sort-toggle">
+      <button id="sortRecentBtn" class="active">Most Recent</button>
+      <button id="sortDistanceBtn">Nearest to Me</button>
+    </div>
+    <input type="text" id="cropFilter" placeholder="Filter by crop…" />
+    <input type="text" id="districtFilter" placeholder="Filter by district…" />
+    <button class="btn-secondary" id="applyFilterBtn">Apply</button>
+  </div>
+
+  <div id="txGrid" class="tx-grid"></div>
+  <div id="emptyState" class="empty-state" style="display:none;">No transactions found.</div>
+
+  <div class="pager">
+    <button id="prevPageBtn">← Prev</button>
+    <span id="pageLabel">Page 1</span>
+    <button id="nextPageBtn">Next →</button>
+  </div>
+</main>
+
+<!-- Transaction detail modal -->
+<div class="overlay" id="modalOverlay">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="modalTitle">Transaction</h2>
+      <button class="modal-close" id="modalCloseBtn">✕</button>
+    </div>
+    <div id="modalBody">
+      <p style="color:var(--text-muted); font-size:0.85rem;">Geocoding pickup, delivery, and your base location…</p>
+    </div>
+  </div>
+</div>
+
+<!-- Chat drawer -->
+<div id="chatDrawer">
+  <div class="chat-header">
+    <strong id="chatWithLabel">Chat</strong>
+    <button id="chatCloseBtn">✕</button>
+  </div>
+  <div id="chatMessages"></div>
+  <div id="chatInputRow">
+    <input type="text" id="chatInput" placeholder="Type a message…" />
+    <button id="chatSendBtn">Send</button>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+<script src="auth-guard.js"></script>
+<script>
+const BACKEND_URL = window.NEXORA_API_BASE || 'http://localhost:5000';
+const API_BASE = `${BACKEND_URL}/api/logistics`;
+
+// Logistics partners are now just role:'logistics' Users, authenticated the
+// same way as everyone else — this also injects the nav badge and wires up
+// any [data-action="logout"] / .logout-btn elements automatically.
+if (!AuthGuard.require('logistics')) {
+  // AuthGuard.require() already redirected to auth.html with a message.
+  throw new Error('Not authenticated');
+}
+const token = AuthGuard.getToken();
+const partner = AuthGuard.getUser();
+
+document.getElementById('partnerBadge').textContent = `🚚 ${partner.name}`;
+document.getElementById('logoutBtn').addEventListener('click', () => AuthGuard.logout());
+
+let currentPage = 1;
+let sortMode = 'recent'; // 'recent' | 'distance'
+let map = null;
+
+async function authedFetch(path, opts = {}) {
+  const res = await fetch(`${API_BASE}${path}`, {
+    ...opts,
+    headers: { ...(opts.headers || {}), Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+  });
+  if (res.status === 401) {
+    AuthGuard.logout();
+    return null;
+  }
+  const data = await res.json();
+  if (!res.ok) {
+    // Surface the real backend error instead of letting callers crash on
+    // undefined fields (e.g. renderModal expecting data.pickup that never came).
+    const err = new Error(data.detail || data.error || `Request failed (${res.status})`);
+    err.status = res.status;
+    throw err;
+  }
+  return data;
+}
+
+async function loadTransactions() {
+  const grid = document.getElementById('txGrid');
+  grid.innerHTML = '<p style="color:var(--text-muted); grid-column:1/-1;">Loading…</p>';
+
+  const crop = document.getElementById('cropFilter').value.trim();
+  const district = document.getElementById('districtFilter').value.trim();
+
+  let data;
+  try {
+    if (sortMode === 'distance') {
+      data = await authedFetch(`/transactions/sorted-by-distance?page=${currentPage}&limit=20`);
+    } else {
+      const params = new URLSearchParams({ page: currentPage, limit: 20 });
+      if (crop) params.set('crop', crop);
+      if (district) params.set('district', district);
+      data = await authedFetch(`/transactions?${params}`);
+    }
+  } catch (err) {
+    grid.innerHTML = `<p style="color:#b91c1c; grid-column:1/-1;">Could not load transactions: ${escapeHtml(err.message)}</p>`;
+    return;
+  }
+
+  if (!data) return;
+  renderGrid(data.transactions || []);
+  document.getElementById('pageLabel').textContent = `Page ${data.page}`;
+  document.getElementById('prevPageBtn').disabled = data.page <= 1;
+  document.getElementById('nextPageBtn').disabled = (data.transactions || []).length < 20;
+}
+
+function renderGrid(transactions) {
+  const grid = document.getElementById('txGrid');
+  const empty = document.getElementById('emptyState');
+
+  if (!transactions.length) {
+    grid.innerHTML = '';
+    empty.style.display = 'block';
+    return;
+  }
+  empty.style.display = 'none';
+
+  grid.innerHTML = transactions.map((t) => `
+    <div class="tx-card" data-id="${t._id}">
+      <div class="crop">${escapeHtml(t.crop || '—')}</div>
+      <div class="variety">${escapeHtml(t.variety || '')}</div>
+      <div class="row"><span>Quantity</span><span>${t.quantity_tons ?? '—'} tons</span></div>
+      <div class="row"><span>Price/qtl</span><span>₹${t.agreed_price_per_quintal ?? '—'}</span></div>
+      <div class="route">📍 ${escapeHtml(t.pickup_location || '')}<br>➡️ ${escapeHtml(t.delivery_location || '')}</div>
+      ${t.distanceFromBaseKm != null ? `<div class="distance-badge">${t.distanceFromBaseKm} km from your base</div>` : ''}
+    </div>
+  `).join('');
+
+  grid.querySelectorAll('.tx-card').forEach((card) => {
+    card.addEventListener('click', () => openTransaction(card.dataset.id));
+  });
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+// ── Sort toggle ──
+document.getElementById('sortRecentBtn').addEventListener('click', () => {
+  sortMode = 'recent'; currentPage = 1;
+  document.getElementById('sortRecentBtn').classList.add('active');
+  document.getElementById('sortDistanceBtn').classList.remove('active');
+  loadTransactions();
+});
+document.getElementById('sortDistanceBtn').addEventListener('click', () => {
+  sortMode = 'distance'; currentPage = 1;
+  document.getElementById('sortDistanceBtn').classList.add('active');
+  document.getElementById('sortRecentBtn').classList.remove('active');
+  loadTransactions();
+});
+document.getElementById('applyFilterBtn').addEventListener('click', () => { currentPage = 1; loadTransactions(); });
+document.getElementById('prevPageBtn').addEventListener('click', () => { if (currentPage > 1) { currentPage--; loadTransactions(); } });
+document.getElementById('nextPageBtn').addEventListener('click', () => { currentPage++; loadTransactions(); });
+
+// ── Transaction detail modal ──
+let currentTransaction = null;
+
+async function openTransaction(id) {
+  document.getElementById('modalOverlay').classList.add('open');
+  document.getElementById('modalBody').innerHTML = '<p style="color:var(--text-muted); font-size:0.85rem;">Geocoding pickup, delivery, and your base location… (first lookup can take a few seconds; repeats are instant)</p>';
+
+  let data;
+  try {
+    data = await authedFetch(`/transactions/${id}/geocode`, { method: 'POST' });
+  } catch (err) {
+    document.getElementById('modalBody').innerHTML = `<p style="color:#b91c1c; font-size:0.85rem;">Could not load this transaction: ${escapeHtml(err.message)}</p>`;
+    return;
+  }
+  if (!data) return;
+  currentTransaction = { id, ...data };
+  renderModal(data);
+}
+
+function renderModal(data) {
+  document.getElementById('modalTitle').textContent = data.pickup.location.split(',')[0] + ' → ' + data.delivery.location.split(',')[0];
+
+  const ownedTypes = new Set((partner.vehicles || []).map((v) => v.vehicleType));
+
+  document.getElementById('modalBody').innerHTML = `
+    <div class="distance-summary">
+      <div class="stat"><div class="label">Pickup → Delivery</div><div class="value">${data.distancePickupToDeliveryKm} km</div></div>
+      <div class="stat"><div class="label">Your Base → Pickup</div><div class="value">${data.distanceBaseToPickupKm} km</div></div>
+    </div>
+    <div id="map"></div>
+    <h3 style="font-size:0.95rem; margin-bottom:0.5rem; color:var(--leaf-deep);">Cost & Time Estimate</h3>
+    <table class="vehicle-table">
+      <thead><tr><th>Vehicle</th><th>Distance</th><th>Est. Cost</th><th>Est. Time</th></tr></thead>
+      <tbody>
+        ${data.vehicleEstimates.map((v) => `
+          <tr class="${ownedTypes.has(v.vehicleType) ? 'owned' : ''}">
+            <td>${v.label}</td>
+            <td>${v.distanceKm} km</td>
+            <td>₹${v.estimatedCost}</td>
+            <td>${v.estimatedTransitHours} hr</td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+    <div class="chat-actions">
+      <button class="btn-secondary" id="msgFarmerBtn">💬 Message Farmer</button>
+      <button class="btn-secondary" id="msgBuyerBtn">💬 Message Buyer/Industry</button>
+    </div>
+  `;
+
+  setTimeout(() => initMap(data), 50);
+
+  document.getElementById('msgFarmerBtn').addEventListener('click', () => openChat(currentTransaction.id, currentTransaction.farmer_id, 'farmer'));
+  document.getElementById('msgBuyerBtn').addEventListener('click', () => openChat(currentTransaction.id, currentTransaction.buyer_id, 'buyer'));
+}
+
+function initMap(data) {
+  if (map) { map.remove(); map = null; }
+  map = L.map('map').setView([data.pickup.lat, data.pickup.lng], 9);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap contributors',
+  }).addTo(map);
+
+  const pickupMarker = L.marker([data.pickup.lat, data.pickup.lng]).addTo(map).bindPopup(`📍 Pickup: ${data.pickup.location}`);
+  const deliveryMarker = L.marker([data.delivery.lat, data.delivery.lng]).addTo(map).bindPopup(`🏭 Delivery: ${data.delivery.location}`);
+  L.polyline([[data.pickup.lat, data.pickup.lng], [data.delivery.lat, data.delivery.lng]], { color: '#15803D', weight: 3, dashArray: '6 6' }).addTo(map);
+
+  map.fitBounds(L.latLngBounds([[data.pickup.lat, data.pickup.lng], [data.delivery.lat, data.delivery.lng]]), { padding: [30, 30] });
+}
+
+document.getElementById('modalCloseBtn').addEventListener('click', () => {
+  document.getElementById('modalOverlay').classList.remove('open');
+});
+
+// ── Chat ──
+// Note: farmer_id/buyer_id in transaction.csv (e.g. "F3242") are display
+// identifiers from the CSV import. If your `transactions` collection stores
+// these as the actual Mongo _id of the corresponding User document, chat
+// works out of the box using those values as otherUserId. If they're a
+// separate business-facing code, add a lookup step here to resolve the real
+// User _id before opening the conversation — everything else (rooms, events,
+// message storage) is already wired.
+let socket = null;
+let activeConversation = null;
+
+function connectSocket() {
+  if (socket) return;
+  socket = io(BACKEND_URL, { auth: { token } });
+  socket.on('logistics_new_message', (msg) => {
+    if (activeConversation && msg.conversationId === activeConversation.conversationId) {
+      renderBubble(msg, msg.sender === partner.id);
+    }
+  });
+  socket.on('logistics_message_error', (err) => {
+    console.error('Logistics chat error:', err);
+  });
+}
+
+async function openChat(transactionId, otherUserId, otherUserRole) {
+  if (!otherUserId) {
+    alert('This transaction is missing a resolvable user id for chat — see the note in logistics-portal.html.');
+    return;
+  }
+  connectSocket();
+
+  document.getElementById('chatWithLabel').textContent = `Chat — ${otherUserRole === 'farmer' ? 'Farmer' : 'Buyer/Industry'}`;
+  document.getElementById('chatDrawer').classList.add('open');
+  document.getElementById('chatMessages').innerHTML = '<p style="color:var(--text-muted); font-size:0.8rem;">Loading history…</p>';
+
+  socket.emit('logistics_join_conversation', { transactionId, otherUserId });
+
+  const history = await authedFetch(`/messages/${transactionId}/${otherUserId}`);
+  activeConversation = { transactionId, otherUserId, otherUserRole, conversationId: history?.conversationId };
+
+  const box = document.getElementById('chatMessages');
+  box.innerHTML = '';
+  (history?.messages || []).forEach((m) => renderBubble(m, m.sender === partner.id));
+}
+
+function renderBubble(msg, mine) {
+  const box = document.getElementById('chatMessages');
+  const div = document.createElement('div');
+  div.className = `bubble ${mine ? 'mine' : 'theirs'}`;
+  div.textContent = msg.text;
+  box.appendChild(div);
+  box.scrollTop = box.scrollHeight;
+}
+
+document.getElementById('chatCloseBtn').addEventListener('click', () => {
+  document.getElementById('chatDrawer').classList.remove('open');
+});
+
+document.getElementById('chatSendBtn').addEventListener('click', sendChatMessage);
+document.getElementById('chatInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') sendChatMessage(); });
+
+function sendChatMessage() {
+  const input = document.getElementById('chatInput');
+  const text = input.value.trim();
+  if (!text || !activeConversation || !socket) return;
+
+  socket.emit('logistics_send_message', {
+    transactionId: activeConversation.transactionId,
+    otherUserId: activeConversation.otherUserId,
+    otherUserRole: activeConversation.otherUserRole,
+    text,
+  });
+  renderBubble({ text, sender: partner.id }, true);
+  input.value = '';
+}
+
+// ── Init ──
+loadTransactions();
+</script>
+</body>
+</html>
