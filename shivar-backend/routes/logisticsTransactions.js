@@ -5,6 +5,7 @@ const { requireAuth, requireRole } = require('../middleware/auth');
 const { geocodePlace, geocodeMany } = require('../utils/geocode');
 const { haversineKm } = require('../utils/haversine');
 const vehicleRates = require('../config/vehicleRates');
+const LocationCache = require('../models/LocationCache');
 
 const router = express.Router();
 router.use(requireAuth, requireRole('logistics'));
@@ -55,63 +56,64 @@ router.get('/sorted-by-distance', async (req, res) => {
     const partner = await User.findById(req.user.id).lean();
     if (!partner) return res.status(404).json({ error: 'Partner not found' });
 
+    // Your base location (saved after the first lookup, so it is instant later)
     let base;
     try {
       base = await geocodePlace(partner.baseLocation);
     } catch (e) {
       return res.status(400).json({
         error: 'Could not find your base location',
-        detail: `Please check the base location saved in your profile: "${partner.baseLocation}"`,
+        detail: `Please check the base location in your profile: "${partner.baseLocation}"`,
       });
     }
 
-    const rows = await TransactionReadOnly.find({})
-      .sort({ transaction_date: -1 })
-      .skip((page - 1) * limit)
-      .limit(limit)
+    // 1. All transactions, but only the pickup field (small and fast)
+    const all = await TransactionReadOnly.find({}).select('pickup_location').lean();
+
+    // 2. Saved coordinates from LocationCache (no internet lookups at all)
+    const places = [...new Set(all.map((t) => (t.pickup_location || '').trim()).filter(Boolean))];
+    const cached = await LocationCache.find({ placeText: { $in: places } })
+      .select('placeText lat lng')
       .lean();
+    const coordsByPlace = new Map(cached.map((c) => [c.placeText, { lat: c.lat, lng: c.lng }]));
 
-    // Looks up one place. If the full address fails, retries with a shorter one
-    // (village removed), so we still get a taluka/district-level location.
-    const seen = new Map();
-    async function safeGeocode(place) {
-      if (!place) return null;
-      if (seen.has(place)) return seen.get(place);
-      const parts = String(place).split(',').map((s) => s.trim()).filter(Boolean);
-      let result = null;
-      for (let i = 0; i < Math.min(parts.length, 3); i++) {
-        try {
-          result = await geocodePlace(parts.slice(i).join(', '));
-          break;
-        } catch (e) {
-          // try the next, shorter version
-        }
-      }
-      seen.set(place, result);
-      return result;
-    }
+    // 3. Distance for every transaction, then sort. Unknown places go last.
+    const ranked = all.map((t) => {
+      const c = coordsByPlace.get((t.pickup_location || '').trim());
+      return {
+        id: t._id,
+        pickupCoords: c || null,
+        distanceFromBaseKm: c ? round1(haversineKm(base.lat, base.lng, c.lat, c.lng)) : null,
+      };
+    });
 
-    const withDistance = [];
-    for (const r of rows) {
-      const coords = await safeGeocode(r.pickup_location);
-      withDistance.push({
-        ...r,
-        pickupCoords: coords,
-        distanceFromBaseKm: coords
-          ? Math.round(haversineKm(base.lat, base.lng, coords.lat, coords.lng) * 10) / 10
-          : null,
-      });
-    }
-
-    // Places we could not find go to the end of the list
-    withDistance.sort((a, b) => {
+    ranked.sort((a, b) => {
       if (a.distanceFromBaseKm == null && b.distanceFromBaseKm == null) return 0;
       if (a.distanceFromBaseKm == null) return 1;
       if (b.distanceFromBaseKm == null) return -1;
       return a.distanceFromBaseKm - b.distanceFromBaseKm;
     });
 
-    res.json({ page, limit, base: { location: partner.baseLocation, ...base }, transactions: withDistance });
+    // 4. Take only this page, then load the full details for just those rows
+    const pageItems = ranked.slice((page - 1) * limit, page * limit);
+    const docs = await TransactionReadOnly.find({ _id: { $in: pageItems.map((p) => p.id) } }).lean();
+    const docById = new Map(docs.map((d) => [String(d._id), d]));
+
+    const transactions = pageItems
+      .map((p) => ({
+        ...docById.get(String(p.id)),
+        pickupCoords: p.pickupCoords,
+        distanceFromBaseKm: p.distanceFromBaseKm,
+      }))
+      .filter((t) => t._id);
+
+    res.json({
+      page,
+      limit,
+      total: ranked.length,
+      base: { location: partner.baseLocation, ...base },
+      transactions,
+    });
   } catch (err) {
     console.error('❌ /api/logistics/transactions/sorted-by-distance error:', err);
     res.status(500).json({ error: 'Could not sort by distance', detail: err.message });
