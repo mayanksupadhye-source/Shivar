@@ -51,27 +51,7 @@
   h1{font-family:'Playfair Display',serif; font-weight:900; font-size:clamp(1.8rem,4.2vw,2.8rem); color:var(--accent-deep); line-height:1.15; margin-bottom:.9rem;}
   .page-sub{color:var(--text-muted); font-size:1rem;}
 
-  /* ── farm profile switcher ── */
-  .profile-wrap{max-width:1080px; margin:0 auto 2.4rem; padding:0 2rem;}
-  .profile-label{font-size:.78rem; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:var(--text-muted); text-align:center; margin-bottom:.9rem;}
-  .profile-grid{display:flex; gap:.9rem; flex-wrap:wrap; justify-content:center;}
-  .profile-card{flex:1 1 220px; max-width:250px; text-align:left; background:var(--card); border:1.5px solid var(--line); border-radius:14px; padding:1rem 1.1rem; cursor:pointer; transition:.18s; }
-  .profile-card:hover{border-color:var(--accent); transform:translateY(-2px);}
-  .profile-card.active{border-color:var(--accent-deep); background:linear-gradient(135deg,color-mix(in srgb,var(--leaf) 10%,white),color-mix(in srgb,var(--blue) 8%,white)); box-shadow:0 10px 24px rgba(20,83,45,.14);}
-  .profile-card .pname{font-weight:700; font-size:.95rem; color:var(--text-main);}
-  .profile-card .ploc{font-size:.78rem; color:var(--text-muted); margin-top:.15rem;}
-  .profile-card .ptags{margin-top:.55rem; display:flex; gap:.35rem; flex-wrap:wrap;}
-  .profile-card .ptag{font-size:.68rem; font-weight:700; padding:.2rem .55rem; border-radius:6px; background:color-mix(in srgb,var(--leaf) 14%,white); color:var(--leaf-deep);}
-  .profile-card .ptag.blue{background:color-mix(in srgb,var(--blue) 12%,white); color:var(--blue-deep);}
-
-  /* ── summary banner ── */
-  .summary-banner{max-width:1080px; margin:0 auto 2.4rem; padding:0 2rem;}
-  .summary-inner{display:flex; gap:1.4rem; flex-wrap:wrap; align-items:stretch; background:linear-gradient(120deg,var(--leaf-deep),var(--blue-deep)); border-radius:20px; padding:1.6rem 1.9rem; color:#fff; box-shadow:0 18px 40px rgba(20,83,45,.22);}
-  .summary-stat{flex:1 1 150px;}
-  .summary-stat .num{font-family:'Playfair Display',serif; font-weight:900; font-size:1.9rem; line-height:1;}
-  .summary-stat .lbl{font-size:.76rem; opacity:.85; margin-top:.35rem; letter-spacing:.3px;}
-  .summary-note{flex:2 1 260px; font-size:.85rem; opacity:.92; align-self:center; line-height:1.5;}
-
+  
   /* ── section tabs ── */
   .tabs{max-width:1080px; margin:0 auto 1.6rem; padding:0 2rem; display:flex; gap:.6rem; justify-content:center; flex-wrap:wrap;}
   .tab-btn{font-family:'DM Sans',sans-serif; font-size:.88rem; font-weight:600; padding:.65rem 1.3rem; border-radius:10px; border:1.5px solid var(--line); background:var(--card); color:var(--text-muted); cursor:pointer; transition:.18s;}
@@ -165,19 +145,9 @@
   <p class="page-sub" data-i18n="subtitle">Government schemes, FPO membership, and support services — matched to this farm's profile, not searched one by one.</p>
 </section>
 
-<div class="profile-wrap">
-  <div class="profile-label" data-i18n="profileLabel">Sample farm profile — pick one to see live matching</div>
-  <div class="profile-grid" id="profile-grid"></div>
-</div>
 
-<div class="summary-banner">
-  <div class="summary-inner">
-    <div class="summary-stat"><div class="num" id="stat-matched">–</div><div class="lbl" data-i18n="statMatched">Schemes matched</div></div>
-    <div class="summary-stat"><div class="num" id="stat-cash">–</div><div class="lbl" data-i18n="statCash">Guaranteed annual DBT</div></div>
-    <div class="summary-stat"><div class="num" id="stat-fpo">–</div><div class="lbl" data-i18n="statFpo">FPOs in reach</div></div>
-    <div class="summary-note" id="summary-note" data-i18n="summaryNote">Selecting a farm profile re-runs the matching engine below against real, current scheme eligibility rules — nothing here is hand-picked per farmer.</div>
-  </div>
-</div>
+
+
 
 <div class="tabs">
   <button class="tab-btn active" data-tab="schemes" data-i18n="tabSchemes">Govt. Schemes</button>
@@ -425,23 +395,7 @@ async function fetchMatch(profileId){
 /* ============================= RENDER ============================= */
 function t(key){ return (I18N[currentLang] && I18N[currentLang][key]) || I18N.en[key] || key; }
 
-function renderProfiles(){
-  const grid = document.getElementById('profile-grid');
-  grid.innerHTML = PROFILES.map(p => `
-    <div class="profile-card ${p.id===currentProfileId?'active':''}" data-id="${p.id}">
-      <div class="pname">${p.name}</div>
-      <div class="ploc">${p.taluka}, ${p.district} · ${p.region}</div>
-      <div class="ptags">
-        <span class="ptag">${p.crop}</span>
-        <span class="ptag blue">${p.landAcres} ac · ${hectares(p)} ha</span>
-        <span class="ptag">${p.category==='marginal'?'Marginal':'Small'} farmer</span>
-      </div>
-    </div>`).join('');
-  grid.querySelectorAll('.profile-card').forEach(el => el.addEventListener('click', () => {
-    currentProfileId = el.dataset.id;
-    renderAll();
-  }));
-}
+
 
 /* Renders from a unified shape: array of {level,name,native,agency hello world
 ,link,benefit,desc,match,reasons,cash?}
@@ -480,13 +434,12 @@ function renderSchemesFrom(schemeList){
       </div>
     </div>`;
   }).join('');
-  document.getElementById('stat-matched').textContent = matchedCount + ' / ' + schemeList.length;
-  document.getElementById('stat-cash').textContent = '₹' + cashTotal.toLocaleString('en-IN');
+  
 }
 
 function renderFpoFrom(list, profile){
   const grid = document.getElementById('fpo-grid');
-  document.getElementById('stat-fpo').textContent = list.length;
+
   if(list.length === 0){
     grid.innerHTML = `
     <div class="fpo-card pending">
@@ -534,7 +487,7 @@ function renderSupport(){
 
 async function renderAll(){
   const profile = PROFILES.find(p => p.id === currentProfileId);
-  renderProfiles();
+  
 
   const serverData = await fetchMatch(currentProfileId);
   if(serverData){
