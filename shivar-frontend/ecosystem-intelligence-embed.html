@@ -404,7 +404,7 @@ let currentProfileId = 'nashik';
 /* Points at the Flask backend in /backend/app.py. Change this if you deploy
    the API elsewhere (ngrok URL, Render, a college server, etc.) — everything
    else in this file adapts automatically via apiUp/matchCache. */
-const API_BASE = window.NEXORA_API_BASE || 'http://localhost:5000';
+const API_BASE = 'http://localhost:5000';
 let apiUp = false;
 let matchCache = {}; // profile_id -> server response, refreshed on demand
 
