@@ -234,7 +234,7 @@ const SCHEMES = [
     benefit:'₹6,000/year in 3 instalments (DBT)',
     desc:'Direct income support to landholding farmer families; no minimum land-size cap since April 2019.',
     test:(p)=>({match:true, reasons:['Cultivable land recorded under this farm\u2019s name, no income-tax filings on record.']}) },
-  { id:'namoshetkari', level:'state', name:'Namo Shetkari Maha Sanman Nidhi', native:'नमो शेतकरी महासन्मान निधी योजना', agency:'Govt. of Maharashtra', link:'https://mahadbtmahait.gov.in', cash:6000,
+  { id:'namoshetkari', level:'state', name:'Namo Shetkari Maha Sanman Nidhi', native:'नमो शेतकरी महासन्मान निधी योजना', agency:'Govt. of Maharashtra', link:'https://pmkisan.gov.in', cash:6000,
     benefit:'₹6,000/year top-up on PM-KISAN (₹12,000/year combined)',
     desc:'Maharashtra\u2019s own top-up scheme, GR Kisani-2023/CR-42/11A — mirrors PM-KISAN eligibility exactly.',
     test:(p)=>({match:true, reasons:['Automatically follows this farm\u2019s PM-KISAN eligibility.']}) },
@@ -250,11 +250,11 @@ const SCHEMES = [
     test:(p)=> p.pmfbyType==='weather'
       ? {match:true, reasons:[`${p.crop} in ${p.district} is covered under RWBCIS rather than standard PMFBY.`]}
       : {match:false, reasons:[]} },
-  { id:'maha1rupee', level:'state', name:'Maharashtra \u20b91 Crop Insurance Scheme', native:'सर्वसमावेशक पीक विमा योजना (१ रुपयात)', agency:'Govt. of Maharashtra', link:'https://krishi.maharashtra.gov.in',
-    benefit:'State pays the farmer\u2019s entire PMFBY premium share — farmer contributes ₹1',
-    desc:'Applies on top of PMFBY/RWBCIS for any Maharashtra farmer enrolling for the notified crop.',
+    { id:'mahacropins', level:'state', name:'Maharashtra Crop Insurance (2025 revamp)', native:'महाराष्ट्र पीक विमा योजना', agency:'Govt. of Maharashtra', link:'https://pmfby.gov.in',
+    benefit:'Farmer pays 2% (Kharif), 1.5% (Rabi) or 5% (cash/horticultural crops) of the sum insured',
+    desc:'Replaced the earlier ₹1 crop insurance scheme in 2025. Enrol through the PMFBY portal, your bank or a CSC before the season cut-off.',
     test:(p)=> (p.pmfbyType==='yield'||p.pmfbyType==='weather')
-      ? {match:true, reasons:['State absorbs your premium share once you enrol under PMFBY/RWBCIS for this crop.']}
+      ? {match:true, reasons:['This crop is covered for the current season under the state crop insurance scheme.']}
       : {match:false, reasons:[]} },
   { id:'kcc', level:'central', name:'Kisan Credit Card', native:'किसान क्रेडिट कार्ड', agency:'NABARD / scheduled banks', link:'https://www.jansamarth.in',
     benefit:'Crop-loan limit at 4% effective interest (with prompt-repayment subvention), up to ₹3 lakh',
@@ -271,8 +271,8 @@ const SCHEMES = [
   { id:'kusum', level:'central', name:'PM-KUSUM', native:'पीएम कुसुम योजना', agency:'Ministry of New & Renewable Energy', link:'https://pmkusum.mnre.gov.in',
     benefit:'Up to 60% subsidy on a solar irrigation pump, 30% as bank loan',
     desc:'Cuts diesel/grid dependence for micro-irrigation.',
-    test:(p)=>({match:true, reasons:['Landholding size supports a standalone solar pump under Component-B.']}) },
-  { id:'microirrigation', level:'state', name:'Micro-Irrigation Subsidy (Drip/Sprinkler)', native:'सूक्ष्म सिंचन अनुदान योजना', agency:'Govt. of Maharashtra / MahaDBT', link:'https://mahadbtmahait.gov.in',
+        test:(p)=>({match:'check', reasons:['Landholding size supports a standalone solar pump under Component-B.', 'Confirm the current application window on your state nodal portal before relying on this.']}) },
+  { id:'microirrigation', level:'state', name:'Micro-Irrigation Subsidy (Drip/Sprinkler)', native:'सूक्ष्म सिंचन अनुदान योजना', agency:'Govt. of Maharashtra / MahaDBT', link:'https://mahadbt.maharashtra.gov.in/Farmer',
     benefit:null,
     desc:'80% subsidy for marginal farmers (<1 ha), 70% for small (1–2 ha); +10% top-up in Marathwada & Vidarbha.',
     test:(p)=>{
@@ -283,7 +283,7 @@ const SCHEMES = [
       if(topup) reasons.push(`+${topup}% drought-prone top-up for ${p.region}.`);
       return {match:true, reasons, computedBenefit:`Up to ${total}% subsidy on drip/sprinkler equipment for ${p.crop}`};
     } },
-  { id:'yantrikikaran', level:'state', name:'Krishi Yantrikikaran Yojana', native:'कृषी यांत्रिकीकरण योजना', agency:'Govt. of Maharashtra / MahaDBT', link:'https://mahadbtmahait.gov.in',
+  { id:'yantrikikaran', level:'state', name:'Krishi Yantrikikaran Yojana', native:'कृषी यांत्रिकीकरण योजना', agency:'Govt. of Maharashtra / MahaDBT', link:'https://mahadbt.maharashtra.gov.in/Farmer',
     benefit:'Subsidy up to 80% on farm machinery for priority categories',
     desc:'Priority to SC/ST, women, and small/marginal farmers; general category gets a lower slab.',
     test:(p)=> (p.category==='marginal'||p.category==='small')
@@ -301,6 +301,22 @@ const SCHEMES = [
       : {match:false, reasons:[]} }
 ];
 
+SCHEMES.push(
+  { id:'aif', level:'central', name:'Agriculture Infrastructure Fund', native:'कृषी पायाभूत सुविधा निधी', agency:'Dept. of Agriculture & Farmers Welfare, GoI', link:'https://agriinfra.dac.gov.in',
+    benefit:'3% interest subvention on loans up to ₹2 crore, for up to 7 years',
+    desc:'Finances post-harvest and community farming assets such as warehouses, cold storage, pack-houses and grading units. Farmers, FPOs, SHGs and agri-entrepreneurs can apply through a bank.',
+    test:(p)=>({match:true, reasons:['Individual farmers are eligible applicants through any participating bank.', `A warehouse, sorting or cold-chain unit for ${p.crop} is a typical qualifying project.`]}) },
+  { id:'babasaheb', level:'state', name:'Dr. Babasaheb Ambedkar Krushi Swavalamban Yojana', native:'डॉ. बाबासाहेब आंबेडकर कृषी स्वावलंबन योजना', agency:'Govt. of Maharashtra / MahaDBT', link:'https://mahadbt.maharashtra.gov.in/Farmer',
+    benefit:'Subsidy for irrigation assets such as wells, drip and solar pumps (Scheduled Caste farmers)',
+    desc:'Applications are made online on the MahaDBT Farmer portal. A Farmer ID is needed.',
+    test:(p)=>({match:'check', reasons:['Only for Scheduled Caste farmers. Keep the caste certificate and land records ready.']}) },
+  { id:'pocra', level:'state', name:'Nanaji Deshmukh Krishi Sanjivani Prakalp (PoCRA)', native:'नानाजी देशमुख कृषी संजीवनी प्रकल्प', agency:'Dept. of Agriculture, Govt. of Maharashtra', link:'https://mahapocra.gov.in',
+    benefit:'Subsidies for climate-resilient farming such as drip, farm ponds and protected cultivation',
+    desc:'Climate-resilient agriculture project for drought-prone villages. Only farmers in notified project villages can apply.',
+    test:(p)=> (p.regionKey==='marathwada'||p.regionKey==='vidarbha')
+      ? {match:'check', reasons:[`${p.region} is a PoCRA focus region. Check whether this farm's village is on the notified list.`]}
+      : {match:false, reasons:[]} }
+);
 const FPOS = {
   desh: [
     { name:'Sahyadri Farmers Producer Company Ltd.', loc:'Mohadi, Nashik — ~18 km from Niphad', crop:'Grapes, horticulture export', members:'12,000+ farmer-members', desc:'India\u2019s largest fruit & vegetable FPO — owns pack-houses, cold chain and its own export brand for table grapes.', link:'https://sahyadrifarms.com', tags:['Export linkage','Cold storage'] },
@@ -324,7 +340,8 @@ const SUPPORT = {
   ],
   advisory: [
     { name:'Krishi Vigyan Kendra (KVK), district-level', desc:'ICAR\u2019s district-level front-line extension centre — free soil, pest and crop-package advisory, demonstration plots.', link:'https://kvk.icar.gov.in' },
-    { name:'MahaDBT Farmer Portal', desc:'Single application window for most Maharashtra state schemes referenced above.', link:'https://mahadbtmahait.gov.in' }
+        { name:'Farmer ID (AgriStack), needed before applying on MahaDBT', desc:'Maharashtra requires a Farmer ID generated through Agri Stack to get benefits under most agriculture schemes on MahaDBT. Ask your local agriculture office or a CSC to help you get one.', link:null },
+    { name:'MahaDBT Farmer Portal', desc:'Single application window for most Maharashtra state schemes referenced above.', link:'https://mahadbt.maharashtra.gov.in/Farmer' }
   ]
 };
 

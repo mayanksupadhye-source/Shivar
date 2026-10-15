@@ -219,6 +219,7 @@ document.getElementById('partnerBadge').textContent = `🚚 ${partner.name}`;
 document.getElementById('logoutBtn').addEventListener('click', () => AuthGuard.logout());
 
 let currentPage = 1;
+const PAGE_SIZE = 50;
 let sortMode = 'recent'; // 'recent' | 'distance'
 let map = null;
 
@@ -252,9 +253,9 @@ async function loadTransactions() {
   let data;
   try {
     if (sortMode === 'distance') {
-      data = await authedFetch(`/transactions/sorted-by-distance?page=${currentPage}&limit=20`);
+      data = await authedFetch(`/transactions/sorted-by-distance?page=${currentPage}&limit=${PAGE_SIZE}`);
     } else {
-      const params = new URLSearchParams({ page: currentPage, limit: 20 });
+      const params = new URLSearchParams({ page: currentPage, limit: PAGE_SIZE });
       if (crop) params.set('crop', crop);
       if (district) params.set('district', district);
       data = await authedFetch(`/transactions?${params}`);
@@ -268,7 +269,7 @@ async function loadTransactions() {
   renderGrid(data.transactions || []);
   document.getElementById('pageLabel').textContent = `Page ${data.page}`;
   document.getElementById('prevPageBtn').disabled = data.page <= 1;
-  document.getElementById('nextPageBtn').disabled = (data.transactions || []).length < 20;
+  document.getElementById('nextPageBtn').disabled = (data.transactions || []).length < PAGE_SIZE;
 }
 
 function renderGrid(transactions) {

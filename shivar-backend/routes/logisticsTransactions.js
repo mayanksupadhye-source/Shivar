@@ -5,6 +5,7 @@ const { requireAuth, requireRole } = require('../middleware/auth');
 const { geocodePlace, geocodeMany } = require('../utils/geocode');
 const { haversineKm } = require('../utils/haversine');
 const vehicleRates = require('../config/vehicleRates');
+const LocationCache = require('../models/LocationCache');
 
 const router = express.Router();
 router.use(requireAuth, requireRole('logistics'));
@@ -55,27 +56,64 @@ router.get('/sorted-by-distance', async (req, res) => {
     const partner = await User.findById(req.user.id).lean();
     if (!partner) return res.status(404).json({ error: 'Partner not found' });
 
-    const base = await geocodePlace(partner.baseLocation);
+    // Your base location (saved after the first lookup, so it is instant later)
+    let base;
+    try {
+      base = await geocodePlace(partner.baseLocation);
+    } catch (e) {
+      return res.status(400).json({
+        error: 'Could not find your base location',
+        detail: `Please check the base location in your profile: "${partner.baseLocation}"`,
+      });
+    }
 
-    const rows = await TransactionReadOnly.find({})
-      .sort({ transaction_date: -1 })
-      .skip((page - 1) * limit)
-      .limit(limit)
+    // 1. All transactions, but only the pickup field (small and fast)
+    const all = await TransactionReadOnly.find({}).select('pickup_location').lean();
+
+    // 2. Saved coordinates from LocationCache (no internet lookups at all)
+    const places = [...new Set(all.map((t) => (t.pickup_location || '').trim()).filter(Boolean))];
+    const cached = await LocationCache.find({ placeText: { $in: places } })
+      .select('placeText lat lng')
       .lean();
+    const coordsByPlace = new Map(cached.map((c) => [c.placeText, { lat: c.lat, lng: c.lng }]));
 
-    const pickupCoords = await geocodeMany(rows.map((r) => r.pickup_location));
+    // 3. Distance for every transaction, then sort. Unknown places go last.
+    const ranked = all.map((t) => {
+      const c = coordsByPlace.get((t.pickup_location || '').trim());
+      return {
+        id: t._id,
+        pickupCoords: c || null,
+        distanceFromBaseKm: c ? round1(haversineKm(base.lat, base.lng, c.lat, c.lng)) : null,
+      };
+    });
 
-    const withDistance = rows.map((r, i) => ({
-      ...r,
-      pickupCoords: pickupCoords[i],
-      distanceFromBaseKm: Math.round(
-        haversineKm(base.lat, base.lng, pickupCoords[i].lat, pickupCoords[i].lng) * 10,
-      ) / 10,
-    }));
+    ranked.sort((a, b) => {
+      if (a.distanceFromBaseKm == null && b.distanceFromBaseKm == null) return 0;
+      if (a.distanceFromBaseKm == null) return 1;
+      if (b.distanceFromBaseKm == null) return -1;
+      return a.distanceFromBaseKm - b.distanceFromBaseKm;
+    });
 
-    withDistance.sort((a, b) => a.distanceFromBaseKm - b.distanceFromBaseKm);
+    // 4. Take only this page, then load the full details for just those rows
+    const pageItems = ranked.slice((page - 1) * limit, page * limit);
+    const docs = await TransactionReadOnly.find({ _id: { $in: pageItems.map((p) => p.id) } }).lean();
+    const docById = new Map(docs.map((d) => [String(d._id), d]));
 
-    res.json({ page, limit, base: { location: partner.baseLocation, ...base }, transactions: withDistance });
+    const transactions = pageItems
+      .map((p) => ({
+        ...docById.get(String(p.id)),
+        pickupCoords: p.pickupCoords,
+        distanceFromBaseKm: p.distanceFromBaseKm,
+      }))
+      .filter((t) => t._id);
+
+    res.json({
+      page,
+      limit,
+      total: ranked.length,
+      base: { location: partner.baseLocation, ...base },
+      transactions,
+    });
   } catch (err) {
     console.error('❌ /api/logistics/transactions/sorted-by-distance error:', err);
     res.status(500).json({ error: 'Could not sort by distance', detail: err.message });
