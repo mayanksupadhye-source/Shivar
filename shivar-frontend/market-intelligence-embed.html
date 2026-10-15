@@ -359,7 +359,9 @@
     <script>
       const params = new URLSearchParams(location.search);
       // Goes through the Node backend (server.js -> routes/price.js -> price service on 8002)
-      const API_BASE = params.get("api") || "http://localhost:5000/api/price";
+      
+const API_BASE = params.get("api") || `${window.NEXORA_API_BASE || 'http://localhost:5000'}/api/price`;
+
 
       const CROPS = [
         "Areca Nut",
