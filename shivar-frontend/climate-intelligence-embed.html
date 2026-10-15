@@ -457,8 +457,32 @@ async function geocode(query, lang){
   return json.results || [];
 }
 async function reverseByCoords(lat, lon){
-  // Open-Meteo geocoding has no reverse endpoint; label with coordinates, refined if a search result matches later.
-  return `${lat.toFixed(2)}°, ${lon.toFixed(2)}°`;
+  const fallback = `${lat.toFixed(2)}°, ${lon.toFixed(2)}°`;
+
+  // Primary: BigDataCloud (no API key, CORS-enabled)
+  try{
+    const r = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=en`);
+    if(r.ok){
+      const j = await r.json();
+      const place = j.locality || j.city;
+      const state = j.principalSubdivision;
+      if(place) return state ? `${place}, ${state}` : place;
+      if(state) return state;
+    }
+  }catch(e){}
+
+  // Fallback: OpenStreetMap Nominatim
+  try{
+    const r = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&zoom=12&accept-language=en`);
+    if(r.ok){
+      const j = await r.json();
+      const a = j.address || {};
+      const place = a.village || a.town || a.city || a.suburb || a.county || a.state_district;
+      if(place) return a.state ? `${place}, ${a.state}` : place;
+    }
+  }catch(e){}
+
+  return fallback;
 }
 async function fetchWeather(lat, lon){
   const fUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}`
@@ -784,6 +808,7 @@ function wireGeoBtn(){
     navigator.geolocation.getCurrentPosition(async (pos)=>{
       const {latitude, longitude} = pos.coords;
       const label = await reverseByCoords(latitude, longitude);
+      document.getElementById('loc-input').value = label;
       loadPlace(latitude, longitude, label);
     }, ()=>{ banner.className='err'; banner.textContent = I18N[currentLang].errGeo; }, {timeout:8000});
   });
