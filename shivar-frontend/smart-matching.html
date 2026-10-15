@@ -17,109 +17,250 @@
         box-sizing: border-box;
       }
       :root {
-        --earth-dark: #F0FDF4;
+        --earth-dark: #f0fdf4;
         --earth-mid: #ffffff;
-        --leaf: #15803D;
-        --lime: #22C55E;
-        --gold: #FF9933;
-        --text-main: #17352A;
-        --text-muted: #526B61;
-        --blue: #2563EB;
-        --purple: #06B6D4;
-        --red: #DC2626;
+        --leaf: #15803d;
+        --lime: #22c55e;
+        --gold: #ff9933;
+        --text-main: #17352a;
+        --text-muted: #526b61;
+        --blue: #2563eb;
+        --purple: #06b6d4;
+        --red: #dc2626;
         --sidebar: 260px;
       }
       body {
         font-family: "DM Sans", sans-serif;
-        background: linear-gradient(180deg, #F0FDF4 0%, #F0F9FF 50%, #F0FDF4 100%);
+        background: linear-gradient(
+          180deg,
+          #f0fdf4 0%,
+          #f0f9ff 50%,
+          #f0fdf4 100%
+        );
         color: var(--text-main);
         display: flex;
         min-height: 100vh;
       }
 
       /* ── CUSTOM CURSOR ── */
-     
-      #cursor-dot, #cursor-ring {
-        position: fixed; top: 0; left: 0; pointer-events: none; z-index: 9999;
-        border-radius: 50%; transform: translate(-50%,-50%);
-      }
-      #cursor-dot { width: 7px; height: 7px; background: var(--leaf); opacity: 0.9; }
+
+      #cursor-dot,
       #cursor-ring {
-        width: 34px; height: 34px; border: 1.5px solid rgba(21, 128, 61,0.55);
-        transition: width 0.25s, height 0.25s, border-color 0.25s, background 0.25s;
+        position: fixed;
+        top: 0;
+        left: 0;
+        pointer-events: none;
+        z-index: 9999;
+        border-radius: 50%;
+        transform: translate(-50%, -50%);
       }
-      #cursor-ring.hover { width: 58px; height: 58px; border-color: rgba(37, 99, 235,0.7); background: rgba(21, 128, 61,0.08); }
+      #cursor-dot {
+        width: 7px;
+        height: 7px;
+        background: var(--leaf);
+        opacity: 0.9;
+      }
+      #cursor-ring {
+        width: 34px;
+        height: 34px;
+        border: 1.5px solid rgba(21, 128, 61, 0.55);
+        transition:
+          width 0.25s,
+          height 0.25s,
+          border-color 0.25s,
+          background 0.25s;
+      }
+      #cursor-ring.hover {
+        width: 58px;
+        height: 58px;
+        border-color: rgba(37, 99, 235, 0.7);
+        background: rgba(21, 128, 61, 0.08);
+      }
       @media (max-width: 900px), (pointer: coarse) {
-        #cursor-dot, #cursor-ring { display: none !important; }
-        body, a, button { cursor: auto; }
+        #cursor-dot,
+        #cursor-ring {
+          display: none !important;
+        }
+        body,
+        a,
+        button {
+          cursor: auto;
+        }
       }
 
       /* ── PRELOADER ── */
       #preloader {
-        position: fixed; inset: 0; z-index: 10000;
-        background: linear-gradient(160deg, #F0FDF4 0%, #F0F9FF 100%);
-        display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 1rem;
-        transition: opacity 0.6s ease, visibility 0.6s ease;
+        position: fixed;
+        inset: 0;
+        z-index: 10000;
+        background: linear-gradient(160deg, #f0fdf4 0%, #f0f9ff 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+        gap: 1rem;
+        transition:
+          opacity 0.6s ease,
+          visibility 0.6s ease;
       }
       #preloader .pl-mark {
-        font-family: "Playfair Display", serif; font-size: 2.2rem; font-weight: 900;
-        background: linear-gradient(120deg, #14532D, var(--leaf) 40%, var(--blue) 70%, #14532D);
-        background-size: 300% 100%; -webkit-background-clip: text; background-clip: text; color: transparent;
+        font-family: "Playfair Display", serif;
+        font-size: 2.2rem;
+        font-weight: 900;
+        background: linear-gradient(
+          120deg,
+          #14532d,
+          var(--leaf) 40%,
+          var(--blue) 70%,
+          #14532d
+        );
+        background-size: 300% 100%;
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
         animation: gradientSweep 1.6s ease-in-out infinite;
       }
-      #preloader .pl-bar { width: 150px; height: 3px; border-radius: 3px; background: rgba(21, 128, 61,0.15); overflow: hidden; }
+      #preloader .pl-bar {
+        width: 150px;
+        height: 3px;
+        border-radius: 3px;
+        background: rgba(21, 128, 61, 0.15);
+        overflow: hidden;
+      }
       #preloader .pl-bar::after {
-        content: ''; display: block; height: 100%; width: 40%;
+        content: "";
+        display: block;
+        height: 100%;
+        width: 40%;
         background: linear-gradient(90deg, var(--leaf), var(--blue));
         animation: plLoad 1s ease-in-out infinite;
       }
-      @keyframes plLoad { 0% { transform: translateX(-100%); } 100% { transform: translateX(350%); } }
-      #preloader.done { opacity: 0; visibility: hidden; }
+      @keyframes plLoad {
+        0% {
+          transform: translateX(-100%);
+        }
+        100% {
+          transform: translateX(350%);
+        }
+      }
+      #preloader.done {
+        opacity: 0;
+        visibility: hidden;
+      }
 
       /* ── GRAIN ── */
       #page-grain {
-        position: fixed; inset: -20%; z-index: 5; pointer-events: none; opacity: 0.02; mix-blend-mode: multiply;
+        position: fixed;
+        inset: -20%;
+        z-index: 5;
+        pointer-events: none;
+        opacity: 0.02;
+        mix-blend-mode: multiply;
         background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
         animation: grainShift 1.2s steps(4) infinite;
       }
       @keyframes grainShift {
-        0% { transform: translate(0,0); } 25% { transform: translate(-1%,1%); }
-        50% { transform: translate(1%,-1%); } 75% { transform: translate(-1%,-1%); } 100% { transform: translate(0,0); }
+        0% {
+          transform: translate(0, 0);
+        }
+        25% {
+          transform: translate(-1%, 1%);
+        }
+        50% {
+          transform: translate(1%, -1%);
+        }
+        75% {
+          transform: translate(-1%, -1%);
+        }
+        100% {
+          transform: translate(0, 0);
+        }
       }
 
       /* ── SCROLLBAR ── */
-      ::-webkit-scrollbar { width: 10px; }
-      ::-webkit-scrollbar-track { background: #F0FDF4; }
-      ::-webkit-scrollbar-thumb { background: linear-gradient(180deg, var(--leaf), var(--blue)); border-radius: 10px; }
-      html { scrollbar-color: #15803D #F0FDF4; }
+      ::-webkit-scrollbar {
+        width: 10px;
+      }
+      ::-webkit-scrollbar-track {
+        background: #f0fdf4;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: linear-gradient(180deg, var(--leaf), var(--blue));
+        border-radius: 10px;
+      }
+      html {
+        scrollbar-color: #15803d #f0fdf4;
+      }
 
       /* ── ROTATING GLOW BORDER ── */
-      .glow-border { position: relative; }
-      .glow-border::after {
-        content: ''; position: absolute; inset: -1.5px; border-radius: inherit; padding: 1.5px;
-        background: conic-gradient(from 0deg, var(--leaf), var(--blue), var(--gold), var(--leaf));
-        -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-        -webkit-mask-composite: xor; mask-composite: exclude;
-        opacity: 0; transition: opacity 0.3s; pointer-events: none;
+      .glow-border {
+        position: relative;
       }
-      .glow-border:hover::after { opacity: 1; }
-      @keyframes spinBorder { to { transform: rotate(360deg); } }
+      .glow-border::after {
+        content: "";
+        position: absolute;
+        inset: -1.5px;
+        border-radius: inherit;
+        padding: 1.5px;
+        background: conic-gradient(
+          from 0deg,
+          var(--leaf),
+          var(--blue),
+          var(--gold),
+          var(--leaf)
+        );
+        -webkit-mask:
+          linear-gradient(#fff 0 0) content-box,
+          linear-gradient(#fff 0 0);
+        -webkit-mask-composite: xor;
+        mask-composite: exclude;
+        opacity: 0;
+        transition: opacity 0.3s;
+        pointer-events: none;
+      }
+      .glow-border:hover::after {
+        opacity: 1;
+      }
+      @keyframes spinBorder {
+        to {
+          transform: rotate(360deg);
+        }
+      }
 
       /* ── CLICK BURST ── */
       .burst-particle {
-        position: fixed; z-index: 9997; pointer-events: none; font-size: 1rem;
+        position: fixed;
+        z-index: 9997;
+        pointer-events: none;
+        font-size: 1rem;
         animation: burstFly 0.9s ease-out forwards;
       }
-      @keyframes burstFly { to { transform: translate(var(--bx), var(--by)) rotate(var(--br)); opacity: 0; } }
+      @keyframes burstFly {
+        to {
+          transform: translate(var(--bx), var(--by)) rotate(var(--br));
+          opacity: 0;
+        }
+      }
 
       /* ── CARD LIFT ── */
-      .card, .match-card {
-        transition: transform 0.25s ease, box-shadow 0.25s ease;
+      .card,
+      .match-card {
+        transition:
+          transform 0.25s ease,
+          box-shadow 0.25s ease;
       }
       .match-card:hover {
         transform: translateY(-4px);
       }
-      @keyframes gradientSweep { 0%,100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
+      @keyframes gradientSweep {
+        0%,
+        100% {
+          background-position: 0% 50%;
+        }
+        50% {
+          background-position: 100% 50%;
+        }
+      }
 
       /* SIDEBAR */
       .sidebar {
@@ -138,17 +279,32 @@
         font-family: "Playfair Display", serif;
         font-size: 1.5rem;
         font-weight: 900;
-        background: linear-gradient(120deg, #14532D, var(--leaf) 40%, var(--blue) 70%, #14532D);
+        background: linear-gradient(
+          120deg,
+          #14532d,
+          var(--leaf) 40%,
+          var(--blue) 70%,
+          #14532d
+        );
         background-size: 300% 100%;
-        -webkit-background-clip: text; background-clip: text; color: transparent;
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
         animation: gradientSweep 6s ease-in-out infinite;
         padding: 0 1.8rem 2rem;
         border-bottom: 1px solid rgba(21, 128, 61, 0.2);
       }
       .sidebar-logo span {
-        background: linear-gradient(120deg, #1E3A8A, var(--blue) 60%, var(--leaf));
+        background: linear-gradient(
+          120deg,
+          #1e3a8a,
+          var(--blue) 60%,
+          var(--leaf)
+        );
         background-size: 300% 100%;
-        -webkit-background-clip: text; background-clip: text; color: transparent;
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
         animation: gradientSweep 6s ease-in-out infinite;
       }
       .sidebar-label {
@@ -250,11 +406,11 @@
       }
       .badge-blue {
         background: rgba(37, 99, 235, 0.2);
-        color: #1E3A8A;
+        color: #1e3a8a;
       }
       .badge-purple {
         background: rgba(6, 182, 212, 0.2);
-        color: #06B6D4;
+        color: #06b6d4;
       }
 
       /* MATCHING ENGINE UI */
@@ -311,7 +467,7 @@
         box-shadow: 0 6px 20px rgba(21, 128, 61, 0.4);
       }
       .btn-purple {
-        background: linear-gradient(135deg, #0E7490, var(--purple));
+        background: linear-gradient(135deg, #0e7490, var(--purple));
         color: #fff;
       }
       .btn-purple:hover {
@@ -699,7 +855,10 @@
     </style>
   </head>
   <body>
-    <div id="preloader"><div class="pl-mark">Shivar</div><div class="pl-bar"></div>
+    <div id="preloader">
+      <div class="pl-mark">Shivar</div>
+      <div class="pl-bar"></div>
+    </div>
     <div id="page-grain"></div>
     <!-- SIDEBAR -->
     <aside class="sidebar">
@@ -731,38 +890,136 @@
           <span class="badge badge-purple">AI-Powered</span>
         </div>
         <div class="match-controls">
-         
-          <div class="control-group" style="position:relative;">
+          <div class="control-group" style="position: relative">
             <label>Crop Type</label>
-            <input type="text" id="sm-crop-search" placeholder="Type to search e.g. Cotton" autocomplete="off"
-                   oninput="filterSMCropList()" onfocus="showSMCropList()"
-                   style="width:100%;background:rgba(220, 252, 231,0.8);border:1px solid rgba(21, 128, 61,0.25);border-radius:8px;padding:0.6rem 0.9rem;color:#17352A;font-size:0.85rem;"/>
-            <input type="hidden" id="match-crop" value="Cotton"/>
-            <div id="sm-crop-dropdown" style="display:none;position:absolute;z-index:50;top:100%;left:0;right:0;background:#ffffff;border:1px solid rgba(21, 128, 61,0.35);border-radius:8px;max-height:220px;overflow-y:auto;margin-top:4px;box-shadow:0 8px 24px rgba(0,0,0,0.4);"></div>
+            <input
+              type="text"
+              id="sm-crop-search"
+              placeholder="Type to search e.g. Cotton"
+              autocomplete="off"
+              oninput="filterSMCropList()"
+              onfocus="showSMCropList()"
+              style="
+                width: 100%;
+                background: rgba(220, 252, 231, 0.8);
+                border: 1px solid rgba(21, 128, 61, 0.25);
+                border-radius: 8px;
+                padding: 0.6rem 0.9rem;
+                color: #17352a;
+                font-size: 0.85rem;
+              "
+            />
+            <input type="hidden" id="match-crop" value="Cotton" />
+            <div
+              id="sm-crop-dropdown"
+              style="
+                display: none;
+                position: absolute;
+                z-index: 50;
+                top: 100%;
+                left: 0;
+                right: 0;
+                background: #ffffff;
+                border: 1px solid rgba(21, 128, 61, 0.35);
+                border-radius: 8px;
+                max-height: 220px;
+                overflow-y: auto;
+                margin-top: 4px;
+                box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+              "
+            ></div>
           </div>
-          <div class="control-group" style="position:relative;">
+          <div class="control-group" style="position: relative">
             <label>District</label>
-            <input type="text" id="sm-district-search" placeholder="Type to search e.g. Latur" autocomplete="off"
-                   oninput="filterSMDistrictList()" onfocus="showSMDistrictList()"
-                   style="width:100%;background:rgba(220, 252, 231,0.8);border:1px solid rgba(21, 128, 61,0.25);border-radius:8px;padding:0.6rem 0.9rem;color:#17352A;font-size:0.85rem;"/>
-            <input type="hidden" id="match-district" value="All Districts"/>
-            <div id="sm-district-dropdown" style="display:none;position:absolute;z-index:50;top:100%;left:0;right:0;background:#ffffff;border:1px solid rgba(21, 128, 61,0.35);border-radius:8px;max-height:220px;overflow-y:auto;margin-top:4px;box-shadow:0 8px 24px rgba(0,0,0,0.4);"></div>
+            <input
+              type="text"
+              id="sm-district-search"
+              placeholder="Type to search e.g. Latur"
+              autocomplete="off"
+              oninput="filterSMDistrictList()"
+              onfocus="showSMDistrictList()"
+              style="
+                width: 100%;
+                background: rgba(220, 252, 231, 0.8);
+                border: 1px solid rgba(21, 128, 61, 0.25);
+                border-radius: 8px;
+                padding: 0.6rem 0.9rem;
+                color: #17352a;
+                font-size: 0.85rem;
+              "
+            />
+            <input type="hidden" id="match-district" value="All Districts" />
+            <div
+              id="sm-district-dropdown"
+              style="
+                display: none;
+                position: absolute;
+                z-index: 50;
+                top: 100%;
+                left: 0;
+                right: 0;
+                background: #ffffff;
+                border: 1px solid rgba(21, 128, 61, 0.35);
+                border-radius: 8px;
+                max-height: 220px;
+                overflow-y: auto;
+                margin-top: 4px;
+                box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+              "
+            ></div>
           </div>
 
           <div class="control-group">
             <label>Min Quantity (qtl)</label>
-            <input type="number" id="sm-min-qty" placeholder="50" min="0"
-                   style="width:100%;background:rgba(220, 252, 231,0.8);border:1px solid rgba(21, 128, 61,0.25);border-radius:8px;padding:0.6rem 0.9rem;color:#17352A;font-size:0.85rem;" />
+            <input
+              type="number"
+              id="sm-min-qty"
+              placeholder="50"
+              min="0"
+              style="
+                width: 100%;
+                background: rgba(220, 252, 231, 0.8);
+                border: 1px solid rgba(21, 128, 61, 0.25);
+                border-radius: 8px;
+                padding: 0.6rem 0.9rem;
+                color: #17352a;
+                font-size: 0.85rem;
+              "
+            />
           </div>
           <div class="control-group">
             <label>Max Price (₹/qtl)</label>
-            <input type="number" id="sm-max-price" placeholder="8800" min="0"
-                   style="width:100%;background:rgba(220, 252, 231,0.8);border:1px solid rgba(21, 128, 61,0.25);border-radius:8px;padding:0.6rem 0.9rem;color:#17352A;font-size:0.85rem;" />
+            <input
+              type="number"
+              id="sm-max-price"
+              placeholder="8800"
+              min="0"
+              style="
+                width: 100%;
+                background: rgba(220, 252, 231, 0.8);
+                border: 1px solid rgba(21, 128, 61, 0.25);
+                border-radius: 8px;
+                padding: 0.6rem 0.9rem;
+                color: #17352a;
+                font-size: 0.85rem;
+              "
+            />
           </div>
           <div class="control-group">
             <label>Required By</label>
-            <input type="date" id="sm-required-by"
-                   style="width:100%;background:rgba(220, 252, 231,0.8);border:1px solid rgba(21, 128, 61,0.25);border-radius:8px;padding:0.6rem 0.9rem;color:#17352A;font-size:0.85rem;" />
+            <input
+              type="date"
+              id="sm-required-by"
+              style="
+                width: 100%;
+                background: rgba(220, 252, 231, 0.8);
+                border: 1px solid rgba(21, 128, 61, 0.25);
+                border-radius: 8px;
+                padding: 0.6rem 0.9rem;
+                color: #17352a;
+                font-size: 0.85rem;
+              "
+            />
           </div>
           <div class="control-group">
             <label>Match Priority</label>
@@ -781,7 +1038,7 @@
         <!-- AI PULSE -->
         <div class="ai-running" id="ai-pulse">
           <div class="ai-dots"><span></span><span></span><span></span></div>
-          <span style="font-size: 0.88rem; color: #06B6D4"
+          <span style="font-size: 0.88rem; color: #06b6d4"
             >AI is analyzing 42 listings against 18 buyer demands across 6
             regions...</span
           >
@@ -1113,7 +1370,7 @@
                   class="conf-bar-fill"
                   style="
                     width: 71%;
-                    background: linear-gradient(90deg, var(--red), #F59E0B);
+                    background: linear-gradient(90deg, var(--red), #f59e0b);
                   "
                 ></div>
               </div>
@@ -1426,7 +1683,6 @@
         }
       });
 
-      
       // ── REAL SMART MATCHING (rule-based scoring against live MongoDB listings) ──
       async function runMatching() {
         const pulse = document.getElementById("ai-pulse");
@@ -1486,7 +1742,8 @@
             const color =
               score >= 90 ? "#22C55E" : score >= 75 ? "#FF9933" : "#2563EB";
             const tags = [r.quantity_tonnes >= 10 ? "Bulk" : "Small Batch"];
-            if (r.variety && r.variety !== "Not Specified") tags.push(r.variety);
+            if (r.variety && r.variety !== "Not Specified")
+              tags.push(r.variety);
             if (r.taluka) tags.push(r.taluka);
 
             return {
@@ -1522,7 +1779,6 @@
           console.error("Smart matching error:", err);
         }
       }
-
 
       // CHART
       const chartData = {
@@ -1664,22 +1920,33 @@
         const cDot = document.getElementById("cursor-dot");
         const cRing = document.getElementById("cursor-ring");
         if (cDot && cRing && window.matchMedia("(pointer:fine)").matches) {
-          let mx = 0, my = 0, rx = 0, ry = 0;
+          let mx = 0,
+            my = 0,
+            rx = 0,
+            ry = 0;
           document.addEventListener("mousemove", (e) => {
-            mx = e.clientX; my = e.clientY;
-            cDot.style.left = mx + "px"; cDot.style.top = my + "px";
+            mx = e.clientX;
+            my = e.clientY;
+            cDot.style.left = mx + "px";
+            cDot.style.top = my + "px";
           });
           (function animateRing() {
-            rx += (mx - rx) * 0.15; ry += (my - ry) * 0.15;
-            cRing.style.left = rx + "px"; cRing.style.top = ry + "px";
+            rx += (mx - rx) * 0.15;
+            ry += (my - ry) * 0.15;
+            cRing.style.left = rx + "px";
+            cRing.style.top = ry + "px";
             requestAnimationFrame(animateRing);
           })();
           document.body.addEventListener("mouseover", (e) => {
-            const t = e.target.closest("a, button, .btn, .card, .match-card, .sidebar-nav li a");
+            const t = e.target.closest(
+              "a, button, .btn, .card, .match-card, .sidebar-nav li a",
+            );
             if (t) cRing.classList.add("hover");
           });
           document.body.addEventListener("mouseout", (e) => {
-            const t = e.target.closest("a, button, .btn, .card, .match-card, .sidebar-nav li a");
+            const t = e.target.closest(
+              "a, button, .btn, .card, .match-card, .sidebar-nav li a",
+            );
             if (t) cRing.classList.remove("hover");
           });
         }
@@ -1692,7 +1959,8 @@
           for (let i = 0; i < 7; i++) {
             const p = document.createElement("span");
             p.className = "burst-particle";
-            p.textContent = BURST_EMOJI[Math.floor(Math.random() * BURST_EMOJI.length)];
+            p.textContent =
+              BURST_EMOJI[Math.floor(Math.random() * BURST_EMOJI.length)];
             const angle = Math.random() * Math.PI * 2;
             const dist = 35 + Math.random() * 45;
             p.style.setProperty("--bx", Math.cos(angle) * dist + "px");
