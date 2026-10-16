@@ -3,6 +3,7 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
 const { sendOtpEmail, generateOtp } = require("../utils/sendEmail");
+const { requireAuth } = require("../middleware/auth");
 
 const router = express.Router();
 
@@ -16,7 +17,13 @@ const VALID_VEHICLE_TYPES = [
 
 function signToken(user) {
   return jwt.sign(
-    { id: user._id, role: user.role, name: user.name, mobile: user.mobile },
+    {
+      id: user._id,
+      role: user.role,
+      name: user.name,
+      mobile: user.mobile,
+      marketplaceId: user.marketplaceId || null,
+    },
     process.env.JWT_SECRET,
     { expiresIn: process.env.JWT_EXPIRES_IN || "7d" },
   );
@@ -26,10 +33,12 @@ function signToken(user) {
 function publicUser(user) {
   return {
     id: user._id,
+    marketplaceId: user.marketplaceId || null,
     name: user.name,
     role: user.role,
     mobile: user.mobile,
     email: user.email,
+    vibhagCluster: user.vibhagCluster,
     district: user.district,
     village: user.village,
     taluka: user.taluka,
@@ -244,13 +253,28 @@ router.post("/resend-otp", async (req, res) => {
   }
 });
 
-// ── LOGIN ── email or mobile + password
+// ── LOGIN ── email, mobile, or marketplaceId (F0001, B0001) + password
 router.post("/login", async (req, res) => {
   try {
-    const { identifier, password } = req.body; // identifier = email or mobile
-    const user = await User.findOne({
-      $or: [{ email: identifier }, { mobile: identifier }],
-    });
+    const { identifier, password } = req.body;
+    if (!identifier || !password) {
+      return res.status(400).json({ error: "Identifier and password are required" });
+    }
+
+    const cleanId = String(identifier).trim();
+    const digits = cleanId.replace(/\D/g, "");
+
+    const searchConditions = [
+      { email: cleanId.toLowerCase() },
+      { mobile: cleanId },
+      { marketplaceId: cleanId.toUpperCase() },
+    ];
+
+    if (digits.length === 10) {
+      searchConditions.push({ mobile: `+91${digits}` }, { mobile: digits });
+    }
+
+    const user = await User.findOne({ $or: searchConditions });
 
     if (!user) return res.status(401).json({ error: "Invalid credentials" });
 
@@ -275,6 +299,17 @@ router.post("/login", async (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ error: "Login failed", detail: err.message });
+  }
+});
+
+// ── GET CURRENT USER ──
+router.get("/me", requireAuth, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ error: "User not found" });
+    res.json({ user: publicUser(user) });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to fetch user profile", detail: err.message });
   }
 });
 

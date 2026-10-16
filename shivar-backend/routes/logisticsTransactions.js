@@ -127,7 +127,10 @@ router.get('/sorted-by-distance', async (req, res) => {
 // estimate per registered vehicle type.
 router.post('/:id/geocode', async (req, res) => {
   try {
-    const transaction = await TransactionReadOnly.findById(req.params.id).lean();
+    const transaction = await TransactionReadOnly.findById(req.params.id)
+      .populate('farmer', 'name mobile district village marketplaceId')
+      .populate('buyer', 'name companyName mobile district village marketplaceId')
+      .lean();
     if (!transaction) return res.status(404).json({ error: 'Transaction not found' });
 
     const partner = await User.findById(req.user.id).lean();
@@ -142,8 +145,7 @@ router.post('/:id/geocode', async (req, res) => {
     const distancePickupToDeliveryKm = round1(haversineKm(pickup.lat, pickup.lng, delivery.lat, delivery.lng));
     const distanceBaseToPickupKm = round1(haversineKm(base.lat, base.lng, pickup.lat, pickup.lng));
 
-    // Cost/time estimate for every vehicle type (frontend highlights the
-    // partner's own registered vehicles from this list).
+    // Cost/time estimate for every vehicle type
     const estimates = Object.entries(vehicleRates).map(([key, rate]) => ({
       vehicleType: key,
       label: rate.label,
@@ -154,8 +156,14 @@ router.post('/:id/geocode', async (req, res) => {
 
     res.json({
       transactionId: transaction._id,
-      farmer_id: transaction.farmer_id,
-      buyer_id: transaction.buyer_id,
+      farmer_id: transaction.farmer_id || transaction.farmer?.marketplaceId,
+      buyer_id: transaction.buyer_id || transaction.buyer?.marketplaceId,
+      farmerMongoId: String(transaction.farmer?._id || transaction.farmer || ''),
+      buyerMongoId: String(transaction.buyer?._id || transaction.buyer || ''),
+      farmerName: transaction.farmer?.name || 'Farmer',
+      buyerName: transaction.buyer?.name || transaction.buyer?.companyName || 'Buyer',
+      farmerMobile: transaction.farmer?.mobile,
+      buyerMobile: transaction.buyer?.mobile,
       pickup: { location: transaction.pickup_location, ...pickup },
       delivery: { location: transaction.delivery_location, ...delivery },
       base: { location: partner.baseLocation, ...base },
@@ -169,8 +177,31 @@ router.post('/:id/geocode', async (req, res) => {
   }
 });
 
+// POST /api/logistics/transactions/:id/claim
+// Logistics partner claims the delivery
+router.post('/:id/claim', async (req, res) => {
+  try {
+    const tx = await TransactionReadOnly.findById(req.params.id);
+    if (!tx) return res.status(404).json({ error: 'Transaction not found' });
+
+    if (tx.logisticsPartner && String(tx.logisticsPartner) !== req.user.id) {
+      return res.status(409).json({ error: 'Already claimed by another logistics partner' });
+    }
+
+    const partner = await User.findById(req.user.id);
+    tx.logisticsPartner = req.user.id;
+    tx.logistics_id = partner?.marketplaceId || null;
+    tx.status = 'assigned';
+    await tx.save();
+
+    res.json({ message: 'Delivery claimed', transaction: tx });
+  } catch (err) {
+    res.status(500).json({ error: 'Could not claim delivery', detail: err.message });
+  }
+});
+
 function round1(n) {
   return Math.round(n * 10) / 10;
 }
 
-module.exports = router;
+module.exports = router;

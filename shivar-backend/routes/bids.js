@@ -2,7 +2,11 @@ const express = require('express');
 const Bid = require('../models/Bid');
 const Listing = require('../models/Listing');
 const Order = require('../models/Order');
+const Transaction = require('../models/Transaction');
+const Conversation = require('../models/Conversation');
+const User = require('../models/User');
 const { requireAuth, requireRole } = require('../middleware/auth');
+
 
 const router = express.Router();
 
@@ -78,30 +82,91 @@ router.delete('/:id', requireAuth, requireRole('buyer'), async (req, res) => {
   }
 });
 
-// ── ACCEPT bid ── farmer only, creates an Order and marks listing sold
+// ── ACCEPT bid ── farmer only, creates canonical Transaction and Conversation
 router.put('/:id/accept', requireAuth, requireRole('farmer'), async (req, res) => {
   try {
     const bid = await Bid.findById(req.params.id);
     if (!bid) return res.status(404).json({ error: 'Bid not found' });
     if (String(bid.farmer) !== req.user.id) return res.status(403).json({ error: 'Not your listing' });
 
-    bid.status = 'accepted';
-    await bid.save();
+    // IDEMPOTENCY: Check if transaction was already created for this bid
+    let transaction = await Transaction.findOne({ bid: bid._id });
+    if (!transaction) {
+      const [listing, farmerUser, buyerUser] = await Promise.all([
+        Listing.findById(bid.listing),
+        User.findById(bid.farmer),
+        User.findById(bid.buyer),
+      ]);
 
-    await Listing.findByIdAndUpdate(bid.listing, { status: 'sold' });
+      if (!listing) return res.status(404).json({ error: 'Associated listing not found' });
 
-    const order = await Order.create({
-      listing: bid.listing, bid: bid._id, buyer: bid.buyer, farmer: bid.farmer,
-      finalPrice: bid.offerPrice, quantity: bid.quantity,
+      bid.status = 'accepted';
+      await bid.save();
+
+      listing.status = 'sold';
+      await listing.save();
+
+      // Format pickup and delivery locations from profiles and listing
+      const pickupParts = [listing.village, listing.taluka, listing.district, listing.cluster].filter(Boolean);
+      const pickupLocation = pickupParts.length ? pickupParts.join(', ') : (farmerUser?.district || 'Pickup Location, India');
+
+      const deliveryParts = [buyerUser?.village, buyerUser?.taluka, buyerUser?.district, buyerUser?.vibhagCluster].filter(Boolean);
+      const deliveryLocation = deliveryParts.length ? deliveryParts.join(', ') : (buyerUser?.district || 'Delivery Location, India');
+
+      const txSuffix = Math.floor(10000 + Math.random() * 90000);
+      const generatedTxId = `TR${txSuffix}`;
+
+      transaction = await Transaction.create({
+        transaction_id: generatedTxId,
+        listing: listing._id,
+        listing_id: listing.listing_id || null,
+        farmer: bid.farmer,
+        farmer_id: farmerUser?.marketplaceId || null,
+        buyer: bid.buyer,
+        buyer_id: buyerUser?.marketplaceId || null,
+        crop: listing.crop,
+        variety: listing.variety || '',
+        quantity_tons: bid.quantity,
+        agreed_price_per_quintal: bid.offerPrice,
+        pickup_location: pickupLocation,
+        delivery_location: deliveryLocation,
+        status: 'confirmed',
+        bid: bid._id,
+      });
+
+      bid.transaction = transaction._id;
+      await bid.save();
+
+      // Automatically create or link the farmer-buyer conversation for this transaction
+      await Conversation.findOneAndUpdate(
+        { transaction: transaction._id, type: 'farmer_buyer' },
+        {
+          type: 'farmer_buyer',
+          transaction: transaction._id,
+          listing: listing._id,
+          participants: [bid.farmer, bid.buyer],
+          lastMessage: {
+            text: `Deal confirmed for ${listing.crop} (${bid.quantity} tons @ ₹${bid.offerPrice}/qtl)`,
+            sender: bid.farmer,
+            createdAt: new Date(),
+          },
+        },
+        { upsert: true, new: true }
+      );
+
+      // Reject other pending bids on the same listing
+      await Bid.updateMany(
+        { listing: bid.listing, _id: { $ne: bid._id }, status: 'pending' },
+        { status: 'rejected' }
+      );
+    }
+
+    res.json({
+      message: 'Bid accepted, transaction confirmed',
+      bid,
+      transaction,
+      order: transaction, // compatibility alias for older UI scripts
     });
-
-    // Reject other pending bids on the same listing
-    await Bid.updateMany(
-      { listing: bid.listing, _id: { $ne: bid._id }, status: 'pending' },
-      { status: 'rejected' }
-    );
-
-    res.json({ message: 'Bid accepted, order created', bid, order });
   } catch (err) {
     res.status(500).json({ error: 'Could not accept bid', detail: err.message });
   }
