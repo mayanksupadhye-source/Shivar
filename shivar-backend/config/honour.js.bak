@@ -1,0 +1,8 @@
+// All Honour Score numbers live here. Change them here only.
+module.exports = {
+  START_SCORE: 100,        // every farmer starts here
+  PRIOR_WEIGHT: 1,         // how strongly the starting 100 resists early bad reviews
+  BLACKLIST_BELOW: 40,     // score under this ...
+  MIN_REVIEWS_TO_BLACKLIST: 3, // ... AND at least this many reviewed orders => blacklisted
+  RECEIVABLE_STATUSES: ['confirmed', 'shipped'], // order statuses where "Order Received" is allowed
+};

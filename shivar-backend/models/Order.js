@@ -8,6 +8,8 @@ const orderSchema = new mongoose.Schema({
   finalPrice: { type: Number, required: true },
   quantity: { type: Number, required: true },
   status: { type: String, enum: ['confirmed', 'shipped', 'completed', 'cancelled'], default: 'confirmed' },
+  feedbackGiven: { type: Boolean, default: false },
+receivedAt:    { type: Date },
 }, { timestamps: true });
 
 module.exports = mongoose.model('Order', orderSchema);

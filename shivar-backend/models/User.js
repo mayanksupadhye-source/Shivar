@@ -53,6 +53,11 @@ const userSchema = new mongoose.Schema({
   gstNumber: { type: String },
   industryType: { type: String },
 
+  honourScore:   { type: Number, default: 50, min: 0, max: 100 },
+reviewedOrders:{ type: Number, default: 0 },
+isBlacklisted: { type: Boolean, default: false },
+blacklistedAt: { type: Date },
+
   // ── Logistics Partner profile fields (optional) ──
   // Plain text, entered once at signup, e.g. "Nashik, Maharashtra".
   // Geocoded on-demand (see utils/geocode.js) rather than at signup time,

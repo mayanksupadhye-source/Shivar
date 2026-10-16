@@ -1,4 +1,5 @@
 const express = require('express');
+const User = require('../models/User');
 const Listing = require('../models/Listing');
 const { requireAuth, requireRole } = require('../middleware/auth');
 
@@ -13,7 +14,15 @@ router.get('/', async (req, res) => {
     if (status !== 'all') filter.status = status;
     if (crop) filter.crop = new RegExp(crop, 'i');
     if (district) filter.district = new RegExp(district, 'i');
-    if (farmer) filter.farmer = farmer;
+
+    if (farmer) {
+      // a farmer looking at their own listings: never hide these
+      filter.farmer = farmer;
+    } else {
+      // NEW: public browse hides listings of blacklisted farmers
+      const blocked = await User.find({ isBlacklisted: true }).distinct('_id');
+      if (blocked.length) filter.farmer = { $nin: blocked };
+    }
 
     const listings = await Listing.find(filter)
       .populate('farmer', 'name district mobile')
@@ -39,6 +48,12 @@ router.get('/:id', async (req, res) => {
 // ── CREATE listing ── farmer only
 router.post('/', requireAuth, requireRole('farmer'), async (req, res) => {
   try {
+    // NEW: blacklist check must run BEFORE the listing is created, inside the try
+    const me = await User.findById(req.user.id).select('isBlacklisted');
+    if (me && me.isBlacklisted) {
+      return res.status(403).json({ error: 'Your account is blacklisted. You cannot create listings.' });
+    }
+
     const { crop, quantity, unit, pricePerUnit, soilType, region, district, description } = req.body;
     const listing = await Listing.create({
       farmer: req.user.id, crop, quantity, unit, pricePerUnit, soilType, region, district, description,

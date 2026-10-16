@@ -2,6 +2,7 @@ const express = require('express');
 const Bid = require('../models/Bid');
 const Listing = require('../models/Listing');
 const Order = require('../models/Order');
+const User = require('../models/User'); // must match the real path of your User model
 const { requireAuth, requireRole } = require('../middleware/auth');
 
 const router = express.Router();
@@ -13,6 +14,12 @@ router.post('/', requireAuth, requireRole('buyer'), async (req, res) => {
     const listing = await Listing.findById(listingId);
     if (!listing) return res.status(404).json({ error: 'Listing not found' });
     if (listing.status !== 'available') return res.status(400).json({ error: 'Listing is no longer available' });
+
+    // no bids on a blacklisted farmer's listing
+    const farmerUser = await User.findById(listing.farmer).select('isBlacklisted');
+    if (farmerUser && farmerUser.isBlacklisted) {
+      return res.status(403).json({ error: 'This farmer is currently blacklisted and cannot receive bids' });
+    }
 
     const bid = await Bid.create({
       listing: listingId, buyer: req.user.id, farmer: listing.farmer,
@@ -46,7 +53,8 @@ router.get('/my', requireAuth, requireRole('buyer'), async (req, res) => {
   try {
     const bids = await Bid.find({ buyer: req.user.id })
       .populate('listing')
-      .populate('farmer', 'name district mobile')
+      // honourScore + isBlacklisted so buyers can see them
+      .populate('farmer', 'name district mobile honourScore isBlacklisted')
       .sort({ createdAt: -1 });
     res.json(bids);
   } catch (err) {
@@ -88,20 +96,41 @@ router.put('/:id/accept', requireAuth, requireRole('farmer'), async (req, res) =
   try {
     const bid = await Bid.findById(req.params.id);
     if (!bid) return res.status(404).json({ error: 'Bid not found' });
-    if (String(bid.farmer) !== req.user.id) return res.status(403).json({ error: 'Not your listing'  }
-      
-      
-    );
+    if (String(bid.farmer) !== req.user.id) return res.status(403).json({ error: 'Not your listing' });
 
-    bid.status = 'accepted';
-    await bid.save();
+    // blacklisted farmers cannot accept bids
+    const me = await User.findById(req.user.id).select('isBlacklisted');
+    if (me && me.isBlacklisted) {
+      return res.status(403).json({ error: 'Your account is blacklisted. You cannot accept bids.' });
+    }
+
+    if (bid.status !== 'pending') {
+      return res.status(400).json({ error: 'This bid is no longer pending' });
+    }
+
+    // NEW: claim the bid atomically. If two accept clicks arrive together, only one wins.
+    const claimed = await Bid.findOneAndUpdate(
+      { _id: bid._id, status: 'pending' },
+      { status: 'accepted' },
+      { new: true }
+    );
+    if (!claimed) {
+      return res.status(400).json({ error: 'This bid is no longer pending' });
+    }
+
+    // NEW: create the order BEFORE touching the listing. If it fails, undo the claim.
+    let order;
+    try {
+      order = await Order.create({
+        listing: bid.listing, bid: bid._id, buyer: bid.buyer, farmer: bid.farmer,
+        finalPrice: bid.offerPrice, quantity: bid.quantity,
+      });
+    } catch (orderErr) {
+      await Bid.findByIdAndUpdate(bid._id, { status: 'pending' });
+      throw orderErr;
+    }
 
     await Listing.findByIdAndUpdate(bid.listing, { status: 'sold' });
-
-    const order = await Order.create({
-      listing: bid.listing, bid: bid._id, buyer: bid.buyer, farmer: bid.farmer,
-      finalPrice: bid.offerPrice, quantity: bid.quantity,
-    });
 
     // Reject other pending bids on the same listing
     await Bid.updateMany(
@@ -109,7 +138,7 @@ router.put('/:id/accept', requireAuth, requireRole('farmer'), async (req, res) =
       { status: 'rejected' }
     );
 
-    res.json({ message: 'Bid accepted, order created', bid, order });
+    res.json({ message: 'Bid accepted, order created', bid: claimed, order });
   } catch (err) {
     res.status(500).json({ error: 'Could not accept bid', detail: err.message });
   }
@@ -121,6 +150,11 @@ router.put('/:id/reject', requireAuth, requireRole('farmer'), async (req, res) =
     const bid = await Bid.findById(req.params.id);
     if (!bid) return res.status(404).json({ error: 'Bid not found' });
     if (String(bid.farmer) !== req.user.id) return res.status(403).json({ error: 'Not your listing' });
+
+    // only pending bids can be rejected
+    if (bid.status !== 'pending') {
+      return res.status(400).json({ error: 'This bid is no longer pending' });
+    }
 
     bid.status = 'rejected';
     await bid.save();
