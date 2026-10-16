@@ -25,8 +25,13 @@ router.post('/', requireAuth, requireRole('buyer'), async (req, res) => {
 });
 
 // ── GET bids for a listing ── (farmer checking offers they've received)
-router.get('/listing/:listingId', requireAuth, async (req, res) => {
+router.get('/listing/:listingId', requireAuth, requireRole('farmer'), async (req, res) => {
   try {
+    const listing = await Listing.findById(req.params.listingId);
+    if (!listing) return res.status(404).json({ error: 'Listing not found' });
+    if (String(listing.farmer) !== req.user.id) {
+      return res.status(403).json({ error: 'Not your listing' });
+    }
     const bids = await Bid.find({ listing: req.params.listingId })
       .populate('buyer', 'name district mobile')
       .sort({ createdAt: -1 });
@@ -83,7 +88,10 @@ router.put('/:id/accept', requireAuth, requireRole('farmer'), async (req, res) =
   try {
     const bid = await Bid.findById(req.params.id);
     if (!bid) return res.status(404).json({ error: 'Bid not found' });
-    if (String(bid.farmer) !== req.user.id) return res.status(403).json({ error: 'Not your listing' });
+    if (String(bid.farmer) !== req.user.id) return res.status(403).json({ error: 'Not your listing'  }
+      
+      
+    );
 
     bid.status = 'accepted';
     await bid.save();

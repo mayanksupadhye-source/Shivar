@@ -247,32 +247,45 @@ router.post("/resend-otp", async (req, res) => {
 // ── LOGIN ── email or mobile + password
 router.post("/login", async (req, res) => {
   try {
-    const { identifier, password } = req.body; // identifier = email or mobile
-    const user = await User.findOne({
-      $or: [{ email: identifier }, { mobile: identifier }],
-    });
+    const { identifier, password, role } = req.body;
+    if (!identifier || !password) {
+      return res.status(400).json({ error: "Please fill all fields" });
+    }
+    if (!["farmer", "buyer", "logistics"].includes(role)) {
+      return res.status(400).json({ error: "Please select a portal to log in to" });
+    }
 
+    const id = String(identifier).trim();
+    const user = await User.findOne({
+      $or: [
+        { email: id.toLowerCase() },
+        { mobile: id.replace(/\D/g, "").slice(-10) },
+      ],
+    });
     if (!user) return res.status(401).json({ error: "Invalid credentials" });
 
     const match = await bcrypt.compare(password, user.passwordHash);
     if (!match) return res.status(401).json({ error: "Invalid credentials" });
 
+    // ── ROLE CHECK (after password, so roles can't be probed without credentials) ──
+    if (user.role !== role) {
+      const labels = { farmer: "Farmer", buyer: "Buyer", logistics: "Logistics" };
+      return res.status(403).json({
+        error: `This account is registered as ${labels[user.role]}. Please log in from the ${labels[user.role]} portal.`,
+        code: "ROLE_MISMATCH",
+      });
+    }
+
     if (!user.isVerified) {
-      return res
-        .status(403)
-        .json({
-          error: "Email not verified",
-          userId: user._id,
-          needsVerification: true,
-        });
+      return res.status(403).json({
+        error: "Email not verified",
+        userId: user._id,
+        needsVerification: true,
+      });
     }
 
     const token = signToken(user);
-    res.json({
-      message: "Login successful",
-      token,
-      user: publicUser(user),
-    });
+    res.json({ message: "Login successful", token, user: publicUser(user) });
   } catch (err) {
     res.status(500).json({ error: "Login failed", detail: err.message });
   }
