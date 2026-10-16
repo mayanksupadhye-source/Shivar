@@ -11,7 +11,8 @@
     <script src="auth-guard.js"></script>
     <script src="blockchain.js"></script>
     <script src="ai-advisor.js"></script>
-    <script src="http://localhost:5000/socket.io/socket.io.js"></script>
+    <script src="socket.io.min.js"></script>
+    <script>if (typeof io === 'undefined') { document.write('<script src="http://localhost:5000/socket.io/socket.io.js"><\/script>'); }</script>
     <script src="api-client.js"></script>
     <style>
       *,

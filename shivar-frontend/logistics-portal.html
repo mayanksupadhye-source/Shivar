@@ -196,7 +196,12 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+<script src="socket.io.min.js"></script>
+<script>
+  if (typeof io === 'undefined') {
+    document.write('<script src="' + (window.NEXORA_API_BASE || 'http://localhost:5000') + '/socket.io/socket.io.js"><\/script>');
+  }
+</script>
 <script src="auth-guard.js"></script>
 <script>
 const BACKEND_URL = window.NEXORA_API_BASE || 'http://localhost:5000';
@@ -438,6 +443,11 @@ let activeConversation = null;
 
 function connectSocket() {
   if (socket) return;
+  if (typeof io === 'undefined') {
+    console.error('Socket.IO client library is not loaded');
+    alert('Real-time chat is unavailable because the Socket.IO client library could not be loaded. Please ensure the backend is running at http://localhost:5000.');
+    return;
+  }
   socket = io(BACKEND_URL, { auth: { token } });
 
   const handleMsg = (msg) => {
