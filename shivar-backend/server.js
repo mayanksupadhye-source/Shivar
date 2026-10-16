@@ -1,22 +1,24 @@
+
 require('dotenv').config();
+
 const express = require('express');
 const http = require('http');
 const cors = require('cors');
 const { Server } = require('socket.io');
 
 const connectDB = require('./config/db');
-const initUnifiedSocket = require('./sockets/chatSocket');
+const initChatSocket = require('./sockets/chatSocket');
+const initLogisticsChatSocket = require('./sockets/logisticsChatSocket');
 
 const authRoutes = require('./routes/auth');
 const listingRoutes = require('./routes/listings');
-const demandRoutes = require('./routes/demand');
 const bidRoutes = require('./routes/bids');
 const orderRoutes = require('./routes/orders');
-const transactionRoutes = require('./routes/transactions');
 const chatRoutes = require('./routes/chat');
 const matchingRoutes = require('./routes/matching');
 const priceRoutes = require('./routes/price');
 const advisorRoutes = require('./routes/advisor');
+const qualityRoutes = require('./routes/quality.routes');
 
 const logisticsTransactionRoutes = require('./routes/logisticsTransactions');
 const logisticsMessageRoutes = require('./routes/logisticsMessages');
@@ -24,51 +26,79 @@ const logisticsMessageRoutes = require('./routes/logisticsMessages');
 const app = express();
 const server = http.createServer(app);
 
-// ── CORS: allow frontend clients ──
-app.use(cors({ origin: process.env.CLIENT_URL || '*' }));
+const clientOrigin = process.env.CLIENT_URL || '*';
+
+// Middleware
+
+app.use(cors({
+  origin: [
+    'http://127.0.0.1:5500',
+    'http://localhost:5500'
+  ],
+  credentials: true
+}));
+
 app.use(express.json());
 
-// ── Unified Socket.io Gateway ──
-const io = new Server(server, {
-  cors: { origin: process.env.CLIENT_URL || '*' },
-});
-initUnifiedSocket(io);
-app.set('io', io);
-
-// ── Routes ──
+// Existing API routes
 app.use('/api/auth', authRoutes);
 app.use('/api/listings', listingRoutes);
-app.use('/api/demand', demandRoutes);
 app.use('/api/bids', bidRoutes);
 app.use('/api/orders', orderRoutes);
-app.use('/api/transactions', transactionRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/matching', matchingRoutes);
 app.use('/api/price', priceRoutes);
 app.use('/api/advisor', advisorRoutes);
 
-// Logistics portal endpoints
 app.use('/api/logistics/transactions', logisticsTransactionRoutes);
 app.use('/api/logistics/messages', logisticsMessageRoutes);
 
-app.get('/', (req, res) => {
-  res.json({ status: 'SHIVAR API is running', version: '2.0-canonical' });
+// AI Crop Quality API
+app.use('/api/quality', qualityRoutes);
+
+// Socket.IO
+const io = new Server(server, {
+  cors: { origin: clientOrigin }
 });
 
-// ── Basic error handler ──
+initChatSocket(io);
+initLogisticsChatSocket(io);
+
+// Health check
+app.get('/', (req, res) => {
+  res.json({
+    status: 'Nexora API is running',
+    qualityApi: '/api/quality/analyze'
+  });
+});
+
+// Error handler
 app.use((err, req, res, next) => {
-  console.error(err);
-  res.status(500).json({ error: 'Something went wrong', detail: err.message });
+  console.error('Backend error:', err.message);
+
+  const status = err.status || err.statusCode || 500;
+
+  res.status(status).json({
+    error: status >= 500
+      ? 'Something went wrong'
+      : err.message
+  });
 });
 
 const PORT = process.env.PORT || 5000;
 
-if (require.main === module) {
-  connectDB().then(() => {
+async function startServer() {
+  try {
+    await connectDB();
+
     server.listen(PORT, () => {
-      console.log(`🚀 SHIVAR backend running on port ${PORT}`);
+      console.log(`Nexora backend running on port ${PORT}`);
+      console.log('Crop Quality API: POST /api/quality/analyze');
     });
-  });
+  } catch (error) {
+    console.error('Backend startup failed:', error.message);
+    process.exit(1);
+  }
 }
 
-module.exports = { app, server };
+startServer();
