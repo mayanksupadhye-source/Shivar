@@ -29,6 +29,8 @@ router.get('/', async (req, res) => {
 
     const [rows, total] = await Promise.all([
       TransactionReadOnly.find(filter)
+        .populate('farmer', 'name mobile district village marketplaceId')
+        .populate('buyer', 'name companyName mobile district village marketplaceId')
         .sort({ transaction_date: -1 })
         .skip((page - 1) * limit)
         .limit(limit)
@@ -96,7 +98,10 @@ router.get('/sorted-by-distance', async (req, res) => {
 
     // 4. Take only this page, then load the full details for just those rows
     const pageItems = ranked.slice((page - 1) * limit, page * limit);
-    const docs = await TransactionReadOnly.find({ _id: { $in: pageItems.map((p) => p.id) } }).lean();
+    const docs = await TransactionReadOnly.find({ _id: { $in: pageItems.map((p) => p.id) } })
+      .populate('farmer', 'name mobile district village marketplaceId')
+      .populate('buyer', 'name companyName mobile district village marketplaceId')
+      .lean();
     const docById = new Map(docs.map((d) => [String(d._id), d]));
 
     const transactions = pageItems

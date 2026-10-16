@@ -682,6 +682,7 @@
           >
         </li>
         <li><a href="#" onclick="showPanel('listings')">🌾 My Listings</a></li>
+        <li><a href="#" onclick="showPanel('demands')">📢 Buyer Demands</a></li>
         <li><a href="#" onclick="showPanel('bids')">📋 Active Bids</a></li>
         <li><a href="#" onclick="showPanel('messages')">💬 Messages</a></li>
         <li><a href="#" onclick="showPanel('ai')">🤖 AI Advisor</a></li>
@@ -710,6 +711,7 @@
       <div class="page-tabs">
         <div class="ptab active" onclick="showPanel('overview')">Overview</div>
         <div class="ptab" onclick="showPanel('listings')">My Listings</div>
+        <div class="ptab" onclick="showPanel('demands')">📢 Demands</div>
         <div class="ptab" onclick="showPanel('bids')">Bids</div>
         <div class="ptab" onclick="showPanel('messages')">💬 Messages</div>
         <div class="ptab" onclick="showPanel('ai')">🤖 AI Advisor</div>
@@ -1500,6 +1502,23 @@
           </table>
         </div>
       </div>
+
+      <!-- ══════════ BUYER DEMANDS PANEL ══════════ -->
+      <div id="panel-demands" class="panel">
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">📢 Active Buyer Demands</span>
+            <span class="badge badge-gold" id="demands-count-badge">Live</span>
+          </div>
+          <p style="color:var(--muted); font-size:0.85rem; margin-bottom:1.2rem;">
+            Procurement demands posted by verified corporate buyers, mills, and food processors on SHIVAR.
+          </p>
+          <div id="demands-grid" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(300px, 1fr)); gap:1rem;">
+            <p style="color:var(--muted); padding:1rem;">Loading buyer demands…</p>
+          </div>
+        </div>
+      </div>
+
       <div id="panel-bids" class="panel">
         <div class="card">
           <div class="card-header">
@@ -1572,6 +1591,7 @@
         const tabs = [
           "overview",
           "listings",
+          "demands",
           "bids",
           "messages",
           "ai",
@@ -1581,10 +1601,13 @@
           "ecosystem",
         ];
         const idx = tabs.indexOf(id);
-        document.querySelectorAll(".ptab")[idx]?.classList.add("active");
+        if (idx !== -1) {
+          document.querySelectorAll(".ptab")[idx]?.classList.add("active");
+        }
         document
           .querySelectorAll(".sidebar-nav a")
           .forEach((a) => a.classList.remove("active"));
+        if (id === "demands") loadBuyerDemands();
         if (id === "blockchain") refreshBlockchain();
         if (id === "profile") {
           const token = AuthGuard.getToken() || "No token";
@@ -1896,8 +1919,8 @@
             { id: result.bid.buyer, name: "Buyer" },
             { id: user.mobile, name: user.name },
             {
-              crop: result.order.quantity + " units",
-              price: "₹" + result.order.finalPrice,
+              crop: (result.order?.quantity_tons || result.order?.quantity || 1) + " tons",
+              price: "₹" + (result.order?.agreed_price_per_quintal || result.order?.finalPrice || 0),
               type: "DIRECT_PURCHASE",
               platform: "SHIVAR",
             },
@@ -1926,41 +1949,90 @@
       }
 
       // ════════════════════════════════
-      // MESSAGES — real conversations with buyers, built from real bids,
-      // backed by persisted chat history and live Socket.io updates across devices.
+      // MESSAGES — real unified conversations (Buyers + Logistics Partners),
+      // backed by MongoDB Atlas Conversation/Message models and real-time Socket.io.
       // ════════════════════════════════
       let conversations = [];
-      const conversationKey = (listingId, buyerId) => `${listingId}_${buyerId}`;
+      const conversationKey = (contextId, otherId) => `${contextId}_${otherId}`;
 
-      async function loadConversationsFromBids() {
+      function escapeHtml(s) {
+        return String(s || '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+      }
+
+      async function loadConversations() {
+        const me = AuthGuard.getUser();
+        const myId = String(me.id || me._id);
+        const map = new Map();
+
         try {
+          // 1. Load canonical persistent conversations from backend inbox (farmer_buyer & farmer_logistics)
+          const inbox = await NexoraAPI.getInbox();
+          (inbox || []).forEach((c) => {
+            const other = (c.participants || []).find((p) => String(p._id || p.id) !== myId) || c.participants?.[0];
+            const otherId = String(other?._id || other?.id || '');
+            const otherRole = other?.role || (c.type?.includes('logistics') ? 'logistics' : 'buyer');
+            const otherName = other?.name || (otherRole === 'logistics' ? 'Logistics Partner' : (other?.companyName || 'Buyer'));
+            const isLogistics = otherRole === 'logistics' || c.type === 'farmer_logistics';
+            const contextId = String(c.transaction?._id || c.transaction || c.listing?._id || c.listing || '');
+            const key = String(c._id);
+
+            map.set(key, {
+              id: key,
+              conversationId: key,
+              contextId,
+              listingId: c.listing?._id || c.listing || null,
+              transactionId: c.transaction?._id || c.transaction || null,
+              otherId,
+              otherName,
+              otherRole,
+              crop: c.transaction?.crop || c.listing?.crop || 'Agricultural Produce',
+              avatar: isLogistics ? '🚚' : '🏭',
+              preview: c.lastMessage?.text || 'Conversation opened',
+              time: c.lastMessage?.createdAt ? new Date(c.lastMessage.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '',
+              unread: Boolean(c.lastMessage?.sender && String(c.lastMessage.sender) !== myId),
+              thread: [],
+              loaded: false,
+            });
+          });
+        } catch (err) {
+          console.warn('Could not load inbox conversations:', err.message);
+        }
+
+        try {
+          // 2. Also check bids so if a buyer placed a bid with no messages yet, farmer can start conversation
           const bids = await NexoraAPI.getMyBidsAsFarmer();
-          const seen = new Map();
-          bids.forEach((b) => {
+          (bids || []).forEach((b) => {
             if (!b.listing || !b.buyer) return;
-            const key = conversationKey(b.listing._id, b.buyer._id);
-            if (!seen.has(key)) {
-              seen.set(key, {
+            const buyerId = String(b.buyer._id || b.buyer.id || b.buyer);
+            const listingId = String(b.listing._id || b.listing.id || b.listing);
+            const alreadyInMap = Array.from(map.values()).some((c) => c.otherId === buyerId && (c.contextId === listingId || c.listingId === listingId));
+            if (!alreadyInMap) {
+              const key = conversationKey(listingId, buyerId);
+              map.set(key, {
                 id: key,
-                listingId: b.listing._id,
-                otherId: b.buyer._id,
-                otherName: b.buyer.name,
-                crop: b.listing.crop,
-                avatar: "🏭",
-                preview: "Tap to open conversation",
-                time: "",
+                conversationId: null,
+                contextId: listingId,
+                listingId,
+                otherId: buyerId,
+                otherName: b.buyer.name || 'Buyer',
+                otherRole: 'buyer',
+                crop: b.listing.crop || 'Produce',
+                avatar: '🏭',
+                preview: 'Tap to open conversation',
+                time: '',
                 unread: false,
                 thread: [],
                 loaded: false,
               });
             }
           });
-          conversations = Array.from(seen.values());
         } catch (err) {
-          console.warn("Could not load conversations:", err.message);
-          conversations = [];
+          console.warn('Could not load bids for conversations:', err.message);
         }
+
+        conversations = Array.from(map.values());
       }
+      const loadConversationsFromBids = loadConversations;
 
       function renderMessages() {
         const list = document.getElementById("messages-list");
@@ -1969,7 +2041,7 @@
         if (badge) badge.textContent = unread ? unread + " Unread" : "All Read";
 
         if (!conversations.length) {
-          list.innerHTML = `<p style="color:var(--muted);padding:1.5rem;text-align:center;">No conversations yet. Once a buyer bids on your crop, you can message them here.</p>`;
+          list.innerHTML = `<p style="color:var(--muted);padding:1.5rem;text-align:center;">No conversations yet. Once a buyer bids on your crop or a logistics partner connects, messages will appear here.</p>`;
           return;
         }
         list.innerHTML = conversations
@@ -1978,11 +2050,11 @@
     <div class="msg-item ${m.unread ? "unread" : ""}" id="msg-item-${m.id}" onclick="toggleThread('${m.id}')">
       <div class="msg-avatar-sm">${m.avatar}</div>
       <div class="msg-content" style="flex:1">
-        <h5>${m.otherName} <span style="font-size:0.75rem;color:var(--muted);font-weight:400">· ${m.crop}</span>${m.unread ? '<span style="font-size:0.65rem;background:var(--lime);color:#14532D;border-radius:4px;padding:0.1rem 0.4rem;margin-left:0.5rem;font-weight:700">NEW</span>' : ""}</h5>
-        <p>${m.preview}</p>
+        <h5>${escapeHtml(m.otherName)} <span style="font-size:0.75rem;color:var(--muted);font-weight:400">· ${escapeHtml(m.crop)}</span>${m.unread ? '<span style="font-size:0.65rem;background:var(--lime);color:#14532D;border-radius:4px;padding:0.1rem 0.4rem;margin-left:0.5rem;font-weight:700">NEW</span>' : ""}</h5>
+        <p>${escapeHtml(m.preview)}</p>
         <div class="msg-thread" id="thread-${m.id}">
           <div style="margin-bottom:0.8rem" id="thread-body-${m.id}"></div>
-        <div class="msg-reply" onclick="event.stopPropagation()">
+          <div class="msg-reply" onclick="event.stopPropagation()">
             <input type="text" id="reply-${m.id}" placeholder="Type a message..." onkeydown="if(event.key==='Enter')sendReply('${m.id}')"/>
             <button class="small-btn small-btn-green" onclick="event.stopPropagation(); sendReply('${m.id}')" style="background:var(--leaf);color:#fff;border:none;border-radius:8px;padding:0 1rem;cursor:pointer;">Send</button>
           </div>
@@ -1998,11 +2070,14 @@
         const el = document.getElementById("thread-body-" + conv.id);
         if (!el) return;
         const me = AuthGuard.getUser();
+        const myId = String(me.id || me._id);
         el.innerHTML =
           conv.thread
             .map((msg) => {
-              const isMe = String(msg.sender) === String(me.id);
-              return `<div class="msg-bubble ${isMe ? "farmer" : "buyer"}" style="margin-bottom:0.5rem"><span style="font-size:0.7rem;color:var(--muted);display:block;margin-bottom:0.2rem">${isMe ? "You" : conv.otherName}</span>${msg.text}</div>`;
+              const isMe = String(msg.sender) === myId;
+              const senderLabel = isMe ? "You" : (msg.senderName || conv.otherName);
+              const bubbleRoleClass = isMe ? "farmer" : "buyer";
+              return `<div class="msg-bubble ${bubbleRoleClass}" style="margin-bottom:0.5rem"><span style="font-size:0.7rem;color:var(--muted);display:block;margin-bottom:0.2rem">${escapeHtml(senderLabel)}</span>${escapeHtml(msg.text)}</div>`;
             })
             .join("") ||
           '<p style="color:var(--muted);font-size:0.82rem;">No messages yet.</p>';
@@ -2020,13 +2095,14 @@
 
         if (conv) {
           conv.unread = false;
-          item.classList.remove("unread");
+          if (item) item.classList.remove("unread");
           if (!isOpen) {
-            NexoraSocket.joinConversation(conv.listingId, conv.otherId);
+            const contextId = conv.contextId || conv.listingId || conv.transactionId;
+            NexoraSocket.joinConversation(contextId, conv.otherId);
             if (!conv.loaded) {
               try {
                 conv.thread = await NexoraAPI.getChatHistory(
-                  conv.listingId,
+                  contextId,
                   conv.otherId,
                 );
                 conv.loaded = true;
@@ -2044,29 +2120,38 @@
         const input = document.getElementById("reply-" + id);
         const text = input.value.trim();
         if (!text || !conv) return;
-        NexoraSocket.sendMessage(conv.listingId, conv.otherId, text);
+        const contextId = conv.contextId || conv.listingId || conv.transactionId;
+        NexoraSocket.sendMessage(contextId, conv.otherId, text);
         input.value = "";
       }
 
       function handleIncomingMessage(msg) {
+        const me = AuthGuard.getUser();
+        const myId = String(me.id || me._id);
+        const senderId = String(msg.sender);
+        const receiverId = String(msg.receiver);
+
         let conv = conversations.find(
           (c) =>
-            String(c.listingId) === String(msg.listing) &&
-            (String(c.otherId) === String(msg.sender) ||
-              String(c.otherId) === String(msg.receiver)),
+            (msg.conversationId && (String(c.conversationId) === String(msg.conversationId) || String(c.id) === String(msg.conversationId))) ||
+            ((String(c.otherId) === senderId || String(c.otherId) === receiverId) &&
+             (String(c.contextId) === String(msg.transaction) || String(c.contextId) === String(msg.listing) ||
+              String(c.listingId) === String(msg.listing)))
         );
 
         if (!conv) {
-          const me = AuthGuard.getUser();
-          const otherId =
-            String(msg.sender) === String(me.id) ? msg.receiver : msg.sender;
+          const otherId = senderId === myId ? receiverId : senderId;
+          const isLogistics = msg.senderRole === 'logistics';
           conv = {
-            id: conversationKey(msg.listing, otherId),
+            id: String(msg.conversationId || `${msg.listing || msg.transaction}_${otherId}`),
+            conversationId: String(msg.conversationId || ''),
+            contextId: msg.transaction || msg.listing,
             listingId: msg.listing,
+            transactionId: msg.transaction,
             otherId,
-            otherName: msg.senderName || "Buyer",
-            crop: msg.listingCrop || "",
-            avatar: "🏭",
+            otherName: msg.senderName || (isLogistics ? "Logistics Partner" : "Buyer"),
+            crop: msg.crop || msg.listingCrop || "Produce",
+            avatar: isLogistics ? "🚚" : "🏭",
             preview: "",
             time: "",
             unread: false,
@@ -2076,18 +2161,87 @@
           conversations.unshift(conv);
         }
 
-        conv.thread.push(msg);
+        const msgExists = conv.thread.some(m => String(m._id || m.id) === String(msg._id || msg.id));
+        if (!msgExists) {
+          conv.thread.push(msg);
+        }
         conv.preview = msg.text;
         conv.time = "Just now";
-        const me = AuthGuard.getUser();
-        if (String(msg.sender) !== String(me.id)) {
+        if (senderId !== myId) {
           const threadEl = document.getElementById("thread-" + conv.id);
           conv.unread = !(threadEl && threadEl.style.display === "block");
         }
         renderMessages();
         const threadEl = document.getElementById("thread-" + conv.id);
-        if (threadEl && threadEl.style.display === "block")
+        if (threadEl && threadEl.style.display === "block") {
           renderThreadBody(conv);
+        }
+      }
+
+      // ── LOAD BUYER DEMANDS ── real data from MongoDB
+      async function loadBuyerDemands() {
+        const grid = document.getElementById("demands-grid");
+        if (!grid) return;
+        try {
+          const demands = await NexoraAPI.getDemands({ status: "open" });
+          const countBadge = document.getElementById("demands-count-badge");
+          if (countBadge) countBadge.textContent = `${demands.length} Open Demands`;
+
+          if (!demands.length) {
+            grid.innerHTML = '<p style="color:var(--muted); padding:1.5rem; text-align:center; grid-column:1/-1;">No open buyer demands at the moment.</p>';
+            return;
+          }
+
+          grid.innerHTML = demands.map((d) => {
+            const buyerName = d.buyer?.name || d.buyer?.companyName || "Verified Buyer";
+            const buyerDistrict = d.district || d.buyer?.district || "Maharashtra";
+            const qty = d.required_quantity_tons ?? d.quantity ?? "—";
+            const price = d.maximum_price_per_quintal ?? d.maxPrice ?? "—";
+            const reqDate = d.required_by_date ? new Date(d.required_by_date).toLocaleDateString("en-IN") : "Immediate";
+            return `
+              <div style="background:rgba(220, 252, 231, 0.6); border:1px solid rgba(21, 128, 61, 0.2); border-radius:12px; padding:1.2rem; display:flex; flex-direction:column; justify-content:space-between;">
+                <div>
+                  <div style="font-weight:700; color:var(--leaf-deep); font-size:1.1rem; margin-bottom:0.2rem;">${escapeHtml(d.crop)} ${d.variety ? `· ${escapeHtml(d.variety)}` : ''}</div>
+                  <div style="font-size:0.8rem; color:var(--muted); margin-bottom:0.6rem;">🏢 ${escapeHtml(buyerName)} · 📍 ${escapeHtml(buyerDistrict)}</div>
+                  <div style="font-size:0.82rem; margin-bottom:0.3rem;">Required Qty: <strong>${qty} tons</strong></div>
+                  <div style="font-size:0.82rem; margin-bottom:0.3rem;">Target Price: <strong style="color:var(--gold);">₹${price}/qtl</strong></div>
+                  <div style="font-size:0.78rem; color:var(--muted); margin-bottom:0.8rem;">Required by: ${reqDate}</div>
+                </div>
+                <button class="btn btn-green" style="font-size:0.82rem; padding:0.5rem 0.8rem; width:100%;" onclick="openChatFromDemand('${d._id}', '${d.buyer?._id || d.buyer}', '${escapeHtml(buyerName)}', '${escapeHtml(d.crop)}')">💬 Message Buyer to Fulfill</button>
+              </div>
+            `;
+          }).join("");
+        } catch (err) {
+          console.warn("Could not load demands:", err.message);
+          grid.innerHTML = `<p style="color:#b91c1c; padding:1rem; grid-column:1/-1;">Could not load buyer demands: ${escapeHtml(err.message)}</p>`;
+        }
+      }
+
+      function openChatFromDemand(demandId, buyerId, buyerName, crop) {
+        showPanel("messages");
+        const key = conversationKey(demandId, buyerId);
+        let conv = conversations.find(c => c.id === key || (c.otherId === buyerId && c.contextId === demandId));
+        if (!conv) {
+          conv = {
+            id: key,
+            conversationId: null,
+            contextId: demandId,
+            listingId: null,
+            otherId: buyerId,
+            otherName: buyerName,
+            otherRole: "buyer",
+            crop: crop,
+            avatar: "🏭",
+            preview: "Fulfill demand inquiry",
+            time: "Just now",
+            unread: false,
+            thread: [],
+            loaded: false,
+          };
+          conversations.unshift(conv);
+          renderMessages();
+        }
+        toggleThread(conv.id);
       }
 
       // ── LOAD LISTINGS TABLE ── real data from MongoDB, scoped to the logged-in farmer
@@ -2122,10 +2276,10 @@
           .map(
             (l) => `
     <tr>
-      <td>${l.crop}</td>
-      <td>${l.quantity} ${l.unit || "qtl"}</td>
-      <td style="color:var(--gold);font-weight:600;">₹${Number(l.pricePerUnit).toLocaleString("en-IN")}</td>
-      <td>${l.district || l.region || ""}</td>
+      <td>${escapeHtml(l.crop)}</td>
+      <td>${l.quantity ?? l.quantity_tonnes ?? '—'} ${l.unit || "tonnes"}</td>
+      <td style="color:var(--gold);font-weight:600;">₹${Number(l.pricePerUnit ?? l.price_per_quintal ?? 0).toLocaleString("en-IN")}</td>
+      <td>${escapeHtml(l.district || l.region || "")}</td>
       <td><span class="status-pill ${statusPill[l.status] || "status-active"}">${l.status}</span></td>
       <td><span style="font-size:0.72rem;color:var(--lime);">⛓️ On Chain</span></td>
     </tr>`,

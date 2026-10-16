@@ -130,7 +130,6 @@ const NexoraSocket = {
     const s = this.connect();
     if (s) {
       s.emit('join_conversation', { listingId: contextId, transactionId: contextId, otherUserId });
-      s.emit('logistics_join_conversation', { transactionId: contextId, otherUserId });
     }
   },
 
@@ -138,15 +137,21 @@ const NexoraSocket = {
     const s = this.connect();
     if (s) {
       s.emit('send_message', { listingId: contextId, transactionId: contextId, otherUserId, text });
-      s.emit('logistics_send_message', { transactionId: contextId, otherUserId, text });
     }
   },
 
   onMessage(callback) {
     const s = this.connect();
     if (s) {
-      s.on('new_message', callback);
-      s.on('logistics_new_message', callback);
+      const seen = new Set();
+      const handler = (msg) => {
+        const id = String(msg._id || msg.id || '');
+        if (id && seen.has(id)) return;
+        if (id) seen.add(id);
+        callback(msg);
+      };
+      s.on('new_message', handler);
+      s.on('logistics_new_message', handler);
     }
   },
 };

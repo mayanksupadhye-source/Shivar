@@ -269,6 +269,8 @@ async function loadTransactions() {
   document.getElementById('nextPageBtn').disabled = (data.transactions || []).length < PAGE_SIZE;
 }
 
+let loadedTransactionsMap = new Map();
+
 function renderGrid(transactions) {
   const grid = document.getElementById('txGrid');
   const empty = document.getElementById('emptyState');
@@ -279,6 +281,8 @@ function renderGrid(transactions) {
     return;
   }
   empty.style.display = 'none';
+
+  loadedTransactionsMap = new Map(transactions.map((t) => [String(t._id), t]));
 
   grid.innerHTML = transactions.map((t) => `
     <div class="tx-card" data-id="${t._id}">
@@ -297,7 +301,7 @@ function renderGrid(transactions) {
 }
 
 function escapeHtml(s) {
-  return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  return String(s || '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
 // ── Sort toggle ──
@@ -322,26 +326,70 @@ let currentTransaction = null;
 
 async function openTransaction(id) {
   document.getElementById('modalOverlay').classList.add('open');
-  document.getElementById('modalBody').innerHTML = '<p style="color:var(--text-muted); font-size:0.85rem;">Geocoding pickup, delivery, and your base location… (first lookup can take a few seconds; repeats are instant)</p>';
+  const cachedTx = loadedTransactionsMap.get(String(id));
+  currentTransaction = cachedTx ? { ...cachedTx, id } : { id };
 
-  let data;
+  renderModalInitial(currentTransaction);
+
   try {
-    data = await authedFetch(`/transactions/${id}/geocode`, { method: 'POST' });
+    const data = await authedFetch(`/transactions/${id}/geocode`, { method: 'POST' });
+    if (data) {
+      currentTransaction = { ...currentTransaction, ...data };
+      renderModalGeocode(data);
+    }
   } catch (err) {
-    document.getElementById('modalBody').innerHTML = `<p style="color:#b91c1c; font-size:0.85rem;">Could not load this transaction: ${escapeHtml(err.message)}</p>`;
-    return;
+    console.warn('Geocoding notice:', err.message);
+    const sec = document.getElementById('routeMapSection');
+    if (sec) {
+      sec.innerHTML = `<p style="color:var(--text-muted); font-size:0.82rem; padding:0.8rem 0;">Route mapping currently unavailable for this specific address, but direct communication with farmer and buyer is active below.</p>`;
+    }
   }
-  if (!data) return;
-  currentTransaction = { id, ...data };
-  renderModal(data);
 }
 
-function renderModal(data) {
-  document.getElementById('modalTitle').textContent = data.pickup.location.split(',')[0] + ' → ' + data.delivery.location.split(',')[0];
+function renderModalInitial(tx) {
+  const pickup = tx.pickup_location || 'Pickup Location';
+  const delivery = tx.delivery_location || 'Delivery Location';
+  document.getElementById('modalTitle').textContent = `${pickup.split(',')[0]} → ${delivery.split(',')[0]}`;
+
+  const farmerName = tx.farmer?.name || tx.farmerName || 'Farmer';
+  const buyerName = tx.buyer?.name || tx.buyer?.companyName || tx.buyerName || 'Buyer';
+
+  document.getElementById('modalBody').innerHTML = `
+    <div style="background:var(--sand); border-radius:12px; padding:1rem 1.2rem; margin-bottom:1rem; border:1px solid var(--line);">
+      <div style="font-weight:700; color:var(--leaf-deep); font-size:1.1rem; margin-bottom:0.3rem;">${escapeHtml(tx.crop || 'Produce')} ${tx.variety ? `· ${escapeHtml(tx.variety)}` : ''}</div>
+      <div style="font-size:0.85rem; color:var(--text-muted); margin-bottom:0.5rem;">
+        Quantity: <strong>${tx.quantity_tons ?? '—'} tons</strong> &nbsp;|&nbsp; Agreed Price: <strong>₹${tx.agreed_price_per_quintal ?? '—'}/qtl</strong>
+      </div>
+      <div style="font-size:0.82rem; line-height:1.5;">
+        <div>📍 <strong>Pickup:</strong> ${escapeHtml(pickup)} (👨‍🌾 ${escapeHtml(farmerName)})</div>
+        <div>🏭 <strong>Delivery:</strong> ${escapeHtml(delivery)} (🏢 ${escapeHtml(buyerName)})</div>
+      </div>
+    </div>
+
+    <div id="routeMapSection">
+      <p style="color:var(--text-muted); font-size:0.85rem; padding:0.5rem 0;">Calculating route distances and vehicle estimates…</p>
+    </div>
+
+    <div class="chat-actions" style="margin-top:1.2rem;">
+      <button class="btn-secondary" id="msgFarmerBtn" style="flex:1;">💬 Message Farmer (${escapeHtml(farmerName)})</button>
+      <button class="btn-secondary" id="msgBuyerBtn" style="flex:1;">💬 Message Buyer (${escapeHtml(buyerName)})</button>
+    </div>
+  `;
+
+  const getFarmerTarget = () => currentTransaction.farmerMongoId || currentTransaction.farmer?._id || currentTransaction.farmer_id || currentTransaction.farmer;
+  const getBuyerTarget = () => currentTransaction.buyerMongoId || currentTransaction.buyer?._id || currentTransaction.buyer_id || currentTransaction.buyer;
+
+  document.getElementById('msgFarmerBtn').onclick = () => openChat(currentTransaction.id, getFarmerTarget(), 'farmer');
+  document.getElementById('msgBuyerBtn').onclick = () => openChat(currentTransaction.id, getBuyerTarget(), 'buyer');
+}
+
+function renderModalGeocode(data) {
+  const sec = document.getElementById('routeMapSection');
+  if (!sec) return;
 
   const ownedTypes = new Set((partner.vehicles || []).map((v) => v.vehicleType));
 
-  document.getElementById('modalBody').innerHTML = `
+  sec.innerHTML = `
     <div class="distance-summary">
       <div class="stat"><div class="label">Pickup → Delivery</div><div class="value">${data.distancePickupToDeliveryKm} km</div></div>
       <div class="stat"><div class="label">Your Base → Pickup</div><div class="value">${data.distanceBaseToPickupKm} km</div></div>
@@ -351,7 +399,7 @@ function renderModal(data) {
     <table class="vehicle-table">
       <thead><tr><th>Vehicle</th><th>Distance</th><th>Est. Cost</th><th>Est. Time</th></tr></thead>
       <tbody>
-        ${data.vehicleEstimates.map((v) => `
+        ${(data.vehicleEstimates || []).map((v) => `
           <tr class="${ownedTypes.has(v.vehicleType) ? 'owned' : ''}">
             <td>${v.label}</td>
             <td>${v.distanceKm} km</td>
@@ -361,16 +409,9 @@ function renderModal(data) {
         `).join('')}
       </tbody>
     </table>
-    <div class="chat-actions">
-      <button class="btn-secondary" id="msgFarmerBtn">💬 Message Farmer</button>
-      <button class="btn-secondary" id="msgBuyerBtn">💬 Message Buyer/Industry</button>
-    </div>
   `;
 
   setTimeout(() => initMap(data), 50);
-
-  document.getElementById('msgFarmerBtn').addEventListener('click', () => openChat(currentTransaction.id, currentTransaction.farmer_id, 'farmer'));
-  document.getElementById('msgBuyerBtn').addEventListener('click', () => openChat(currentTransaction.id, currentTransaction.buyer_id, 'buyer'));
 }
 
 function initMap(data) {
@@ -392,24 +433,24 @@ document.getElementById('modalCloseBtn').addEventListener('click', () => {
 });
 
 // ── Chat ──
-// Note: farmer_id/buyer_id in transaction.csv (e.g. "F3242") are display
-// identifiers from the CSV import. If your `transactions` collection stores
-// these as the actual Mongo _id of the corresponding User document, chat
-// works out of the box using those values as otherUserId. If they're a
-// separate business-facing code, add a lookup step here to resolve the real
-// User _id before opening the conversation — everything else (rooms, events,
-// message storage) is already wired.
 let socket = null;
 let activeConversation = null;
 
 function connectSocket() {
   if (socket) return;
   socket = io(BACKEND_URL, { auth: { token } });
-  socket.on('logistics_new_message', (msg) => {
-    if (activeConversation && msg.conversationId === activeConversation.conversationId) {
-      renderBubble(msg, msg.sender === partner.id);
+
+  const handleMsg = (msg) => {
+    if (activeConversation && (String(msg.conversationId) === String(activeConversation.conversationId) || String(msg.transaction) === String(activeConversation.transactionId))) {
+      const myId = String(partner.id || partner._id);
+      if (String(msg.sender) !== myId) {
+        renderBubble(msg, false);
+      }
     }
-  });
+  };
+
+  socket.on('logistics_new_message', handleMsg);
+  socket.on('new_message', handleMsg);
   socket.on('logistics_message_error', (err) => {
     console.error('Logistics chat error:', err);
   });
@@ -417,27 +458,42 @@ function connectSocket() {
 
 async function openChat(transactionId, otherUserId, otherUserRole) {
   if (!otherUserId) {
-    alert('This transaction is missing a resolvable user id for chat — see the note in logistics-portal.html.');
+    alert('This transaction is missing an associated participant ID for messaging.');
     return;
   }
   connectSocket();
 
-  document.getElementById('chatWithLabel').textContent = `Chat — ${otherUserRole === 'farmer' ? 'Farmer' : 'Buyer/Industry'}`;
+  const roleLabel = otherUserRole === 'farmer' ? 'Farmer' : 'Buyer/Industry';
+  document.getElementById('chatWithLabel').textContent = `Chat — ${roleLabel}`;
   document.getElementById('chatDrawer').classList.add('open');
-  document.getElementById('chatMessages').innerHTML = '<p style="color:var(--text-muted); font-size:0.8rem;">Loading history…</p>';
+  document.getElementById('chatMessages').innerHTML = '<p style="color:var(--text-muted); font-size:0.8rem; text-align:center; padding:1rem;">Loading history…</p>';
 
   socket.emit('logistics_join_conversation', { transactionId, otherUserId });
 
-  const history = await authedFetch(`/messages/${transactionId}/${otherUserId}`);
+  let history = null;
+  try {
+    history = await authedFetch(`/messages/${transactionId}/${otherUserId}`);
+  } catch (err) {
+    console.warn('Could not fetch chat history via REST:', err.message);
+  }
+
   activeConversation = { transactionId, otherUserId, otherUserRole, conversationId: history?.conversationId };
 
   const box = document.getElementById('chatMessages');
   box.innerHTML = '';
-  (history?.messages || []).forEach((m) => renderBubble(m, m.sender === partner.id));
+  const myId = String(partner.id || partner._id);
+  if (history?.messages && history.messages.length > 0) {
+    history.messages.forEach((m) => renderBubble(m, String(m.sender) === myId));
+  } else {
+    box.innerHTML = '<p style="color:var(--text-muted); font-size:0.8rem; text-align:center; padding:1.5rem 0;">No messages yet. Send a message to start communicating.</p>';
+  }
 }
 
 function renderBubble(msg, mine) {
   const box = document.getElementById('chatMessages');
+  const emptyNotice = box.querySelector('p');
+  if (emptyNotice) emptyNotice.remove();
+
   const div = document.createElement('div');
   div.className = `bubble ${mine ? 'mine' : 'theirs'}`;
   div.textContent = msg.text;
@@ -459,6 +515,7 @@ function sendChatMessage() {
 
   socket.emit('logistics_send_message', {
     transactionId: activeConversation.transactionId,
+    conversationId: activeConversation.conversationId,
     otherUserId: activeConversation.otherUserId,
     otherUserRole: activeConversation.otherUserRole,
     text,
