@@ -1338,8 +1338,17 @@
         btn.disabled = true;
 
         try {
-          const result = await NexoraAPI.login(id, pwd);
-          AuthGuard.saveSession(result.token, result.user);
+          const result = await NexoraAPI.login(id, pwd, currentRole);
+
+// Safety net: never save a session for the wrong portal
+if (result.user.role !== currentRole) {
+  showAlert("❌ This account belongs to a different portal.", "error");
+  btn.innerHTML = "Login to Shivar →";
+  btn.disabled = false;
+  return;
+}
+
+AuthGuard.saveSession(result.token, result.user);
           showAlert(
             `✅ Welcome back, ${result.user.name}! Redirecting...`,
             "success",
