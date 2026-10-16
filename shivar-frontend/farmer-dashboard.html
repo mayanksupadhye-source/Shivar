@@ -2292,5 +2292,405 @@
         });
       })();
     </script>
-  </body>
+  
+<!-- SHIVAR: AI Crop Quality Proof -->
+<style>
+  .quality-proof {
+    margin: 22px 0;
+    padding: 20px;
+    background: #ffffff;
+    border: 1px solid #cde9d6;
+    border-radius: 14px;
+    color: #17472d;
+    font-family: Arial, sans-serif;
+  }
+  .quality-proof h2 { margin-top: 0; font-size: 21px; }
+  .quality-proof p { color: #557060; font-size: 14px; }
+  .qp-actions { display: flex; flex-wrap: wrap; gap: 10px; margin: 14px 0; }
+  .qp-btn {
+    border: 0; border-radius: 8px; padding: 12px 16px;
+    background: #138b49; color: white; font-weight: bold;
+    cursor: pointer;
+  }
+  .qp-btn.secondary { background: #e8f6ed; color: #17683b; }
+  .qp-btn:disabled { opacity: .5; cursor: not-allowed; }
+  #qpPreview { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+  #qpPreview img {
+    width: 105px; height: 95px; object-fit: cover;
+    border-radius: 8px; border: 1px solid #cde9d6;
+  }
+  #qpStatus {
+    padding: 12px; background: #f0f8f2; border-radius: 8px;
+    overflow-wrap: anywhere;
+  }
+  #qpResult { display: none; margin-top: 14px; padding: 14px;
+    border: 1px solid #cde9d6; border-radius: 8px; }
+</style>
+
+<section class="quality-proof" id="cropQualityProof">
+  <h2>🌿 AI Crop Quality Proof</h2>
+  <p>Capture multiple views of your crop before sending it to a buyer.</p>
+
+  <label for="qpCrop"><b>Crop type</b></label>
+  <select id="qpCrop" style="display:block;width:100%;padding:11px;margin:8px 0 14px;border:1px solid #b9ddc4;border-radius:8px">
+    <option value="cotton">Cotton</option>
+    <option value="soybean">Soybean</option>
+    <option value="wheat">Wheat</option>
+    <option value="other">Other</option>
+  </select>
+
+  <label for="qpPhotos"><b>Crop photos (1–5 images)</b></label>
+  <input id="qpPhotos" type="file" accept="image/*" multiple capture="environment"
+         style="display:block;width:100%;margin:12px 0">
+
+  <div id="qpPreview"></div>
+  <p id="qpCount">No photos selected.</p>
+
+  <div class="qp-actions">
+    <button class="qp-btn" id="qpAnalyze" type="button">🔍 Analyze Crop Quality</button>
+    <button class="qp-btn secondary" id="qpClear" type="button">Clear Photos</button>
+  </div>
+
+  <div id="qpStatus" role="status" aria-live="polite">
+    Ready. Capture clear photos in good lighting.
+  </div>
+  <div id="qpResult"></div>
+</section>
+
+<script>
+(() => {
+  const photos = document.getElementById('qpPhotos');
+  const preview = document.getElementById('qpPreview');
+  const count = document.getElementById('qpCount');
+  const status = document.getElementById('qpStatus');
+  const result = document.getElementById('qpResult');
+  const analyze = document.getElementById('qpAnalyze');
+  let selected = [];
+
+  photos.addEventListener('change', () => {
+    selected = Array.from(photos.files || []);
+    result.style.display = 'none';
+    preview.replaceChildren();
+
+    if (selected.length > 5 || selected.some(f => !f.type.startsWith('image/'))) {
+      selected = [];
+      photos.value = '';
+      count.textContent = 'No photos selected.';
+      status.textContent = 'Choose up to 5 image files only.';
+      return;
+    }
+
+    if (selected.some(f => f.size > 8 * 1024 * 1024)) {
+      selected = [];
+      photos.value = '';
+      count.textContent = 'No photos selected.';
+      status.textContent = 'Each image must be 8 MB or smaller.';
+      return;
+    }
+
+    selected.forEach(file => {
+      const img = document.createElement('img');
+      img.alt = 'Selected crop photo';
+      img.src = URL.createObjectURL(file);
+      img.onload = () => URL.revokeObjectURL(img.src);
+      preview.appendChild(img);
+    });
+
+    count.textContent = `${selected.length} photo(s) selected.`;
+    status.textContent = selected.length
+      ? 'Photos selected. Click Analyze Crop Quality to continue.'
+      : 'Ready. Capture clear photos in good lighting.';
+  });
+
+  document.getElementById('qpClear').addEventListener('click', () => {
+    selected = [];
+    photos.value = '';
+    preview.replaceChildren();
+    count.textContent = 'No photos selected.';
+    status.textContent = 'Photos cleared.';
+    result.replaceChildren();
+    result.style.display = 'none';
+  });
+
+  analyze.addEventListener('click', async () => {
+    if (!selected.length) {
+      status.textContent = 'Please capture or select at least one crop photo.';
+      return;
+    }
+
+    analyze.disabled = true;
+    status.textContent = 'Checking connection to the quality-analysis service...';
+    result.style.display = 'none';
+
+    try {
+      const data = new FormData();
+      data.append('cropType', document.getElementById('qpCrop').value);
+      selected.forEach(file => data.append('images', file));
+
+      // Requires a matching authenticated backend endpoint.
+      const response = await fetch(
+  'http://localhost:5000/api/quality/analyze',
+  {
+    method: 'POST',
+    body: data,
+    credentials: 'include'
+  }
+);
+
+const responseText = await response.text();
+let report;
+
+try {
+  report = JSON.parse(responseText);
+} catch {
+  throw new Error(
+    `Server returned invalid JSON (HTTP ${response.status})`
+  );
+}
+
+if (!response.ok) {
+  throw new Error(
+    report.error || `Analysis failed: HTTP ${response.status}`
+  );
+}
+
+if (!report.success || !report.assessment) {
+  throw new Error('AI analysis result is missing from backend response.');
+}
+
+const assessment = report.assessment;
+
+result.replaceChildren();
+
+const heading = document.createElement('h3');
+heading.textContent = 'AI Crop Quality Report';
+result.appendChild(heading);
+
+const details = document.createElement('pre');
+details.style.whiteSpace = 'pre-wrap';
+details.textContent = JSON.stringify(assessment, null, 2);
+result.appendChild(details);
+
+result.style.display = 'block';
+status.textContent = 'AI analysis completed successfully.';
+    } catch (error) {
+      status.textContent =
+        'Photos are ready, but analysis did not complete. The backend endpoint may not exist or the service may be offline. ' +
+        error.message;
+    } finally {
+      analyze.disabled = false;
+    }
+  });
+})();
+</script>
+
+<style>
+  /* Keep quality capture inside the existing Quick List Crop card */
+  #cropQualityProof { display: none !important; }
+
+  .shivar-ai-camera {
+    float: right;
+    margin-top: -8px;
+    padding: 8px 12px;
+    border: 0;
+    border-radius: 9px;
+    background: #e1f8e8;
+    color: #087b39;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .shivar-ai-modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 99999;
+    background: #0009;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+  }
+
+  .shivar-ai-panel {
+    width: min(420px, 100%);
+    background: white;
+    padding: 20px;
+    border-radius: 16px;
+    color: #17472d;
+    font-family: Arial, sans-serif;
+  }
+
+  .shivar-ai-panel video,
+  .shivar-ai-panel canvas {
+    width: 100%;
+    border-radius: 10px;
+    background: #eef7ef;
+    margin: 10px 0;
+  }
+
+  .shivar-ai-panel button {
+    padding: 10px 13px;
+    margin: 4px 3px 4px 0;
+    border: 0;
+    border-radius: 8px;
+    cursor: pointer;
+    background: #128744;
+    color: white;
+    font-weight: 600;
+  }
+
+  .shivar-ai-panel .close-ai { background: #e9f4ec; color: #17472d; }
+  #shivarAiStatus { font-size: 13px; overflow-wrap: anywhere; }
+  #shivarAiScore { font-size: 30px; font-weight: bold; color: #128744; }
+</style>
+
+<div class="shivar-ai-modal" id="shivarAiModal">
+  <div class="shivar-ai-panel">
+    <h3>🌿 AI Crop Quality</h3>
+    <p>Capture a clear photo of your crop.</p>
+
+    <video id="shivarAiVideo" autoplay playsinline></video>
+    <canvas id="shivarAiCanvas" style="display:none"></canvas>
+
+    <div>
+      <button id="shivarAiStart">📷 Open Camera</button>
+      <button id="shivarAiCapture">Capture Photo</button>
+      <button class="close-ai" id="shivarAiClose">Close</button>
+    </div>
+
+    <div id="shivarAiStatus">Camera is not open.</div>
+    <div id="shivarAiScore"></div>
+    <div id="shivarAiReport"></div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const modal = document.getElementById('shivarAiModal');
+  const video = document.getElementById('shivarAiVideo');
+  const canvas = document.getElementById('shivarAiCanvas');
+  const status = document.getElementById('shivarAiStatus');
+  const score = document.getElementById('shivarAiScore');
+  const report = document.getElementById('shivarAiReport');
+  let stream = null;
+  let photoBlob = null;
+
+  // Find the existing Quick List Crop card title reliably.
+  // In this dashboard the title is a span.card-title, not an h1/h2 element.
+  const heading = [...document.querySelectorAll('.card-title')].find(el =>
+    el.textContent.trim().toLowerCase() === 'quick list crop'
+  );
+
+  if (heading && !document.getElementById('shivarAiOpen')) {
+    const button = document.createElement('button');
+    button.id = 'shivarAiOpen';
+    button.className = 'shivar-ai-camera';
+    button.textContent = '📷 AI Quality';
+    button.type = 'button';
+    button.addEventListener('click', () => {
+      modal.style.display = 'flex';
+      status.textContent = 'Click Open Camera to begin.';
+    });
+    heading.appendChild(button);
+  }
+
+  document.getElementById('shivarAiStart').onclick = async () => {
+    try {
+      if (stream) stream.getTracks().forEach(t => t.stop());
+
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: 'environment' } },
+        audio: false
+      });
+
+      video.srcObject = stream;
+      await video.play();
+      status.textContent = 'Camera ready. Point it at the crop.';
+    } catch (err) {
+      status.textContent = 'Camera unavailable. Allow camera permission and use localhost or HTTPS. ' + err.message;
+    }
+  };
+
+  document.getElementById('shivarAiCapture').onclick = async () => {
+    if (!stream || !video.videoWidth) {
+      status.textContent = 'Open the camera first.';
+      return;
+    }
+
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext('2d').drawImage(video, 0, 0);
+
+    photoBlob = await new Promise(resolve =>
+      canvas.toBlob(resolve, 'image/jpeg', 0.9)
+    );
+
+    if (!photoBlob) {
+      status.textContent = 'Photo capture failed. Please try again.';
+      return;
+    }
+
+    status.textContent = 'Photo captured. Connecting to AI analysis...';
+    score.textContent = '';
+    report.textContent = '';
+
+    try {
+      const data = new FormData();
+      data.append('images', photoBlob, 'crop-capture.jpg');
+
+      const cropSelect = document.querySelector(
+        '#cropQualityProof #qpCrop'
+      );
+      data.append('cropType', cropSelect?.value || 'cotton');
+
+      // This endpoint must be implemented by the backend.
+      const response = await fetch('http://localhost:5000/api/quality/analyze', {
+        method: 'POST',
+        body: data,
+        credentials: 'include'
+      });
+
+      if (!response.ok) {
+        throw new Error('Analysis API returned HTTP ' + response.status);
+      }
+
+     
+const result = await response.json();
+const assessment = result.assessment;
+
+if (!result.success || !assessment) {
+  throw new Error(result.error || 'AI assessment missing');
+}
+
+const percentage = assessment.estimatedVisualScore;
+
+if (
+  typeof percentage !== 'number' ||
+  !Number.isFinite(percentage) ||
+  percentage < 0 ||
+  percentage > 100
+) {
+  throw new Error(
+    'AI could not return a reliable quality score. Try a clearer crop photo.'
+  );
+}
+
+    } catch (err) {
+      status.textContent =
+        'Photo captured, but real AI analysis is not connected yet: ' +
+        err.message;
+    }
+  };
+
+  document.getElementById('shivarAiClose').onclick = () => {
+    if (stream) stream.getTracks().forEach(t => t.stop());
+    stream = null;
+    video.srcObject = null;
+    modal.style.display = 'none';
+  };
+})();
+</script>
+
+</body>
 </html>
