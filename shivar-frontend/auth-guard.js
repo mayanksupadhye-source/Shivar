@@ -38,7 +38,17 @@ const AuthGuard = {
   },
 
   // JWTs use base64URL encoding (- and _ instead of + and /), which plain atob() can't read
-  _base64UrlDecode(str) {
+  getTokenPayload() {
+  try {
+    return JSON.parse(this._base64UrlDecode(this.getToken().split('.')[1]));
+  } catch { return null; }
+},
+  getTokenPayload() {
+  try {
+    return JSON.parse(this._base64UrlDecode(this.getToken().split('.')[1]));
+  } catch { return null; }
+},
+_base64UrlDecode(str) {
     let base64 = str.replace(/-/g, '+').replace(/_/g, '/');
     while (base64.length % 4) base64 += '=';
     return decodeURIComponent(atob(base64).split('').map(c =>
@@ -47,24 +57,34 @@ const AuthGuard = {
   },
 
   // ── REQUIRE AUTH + ROLE ──
-  require(allowedRoles) {
-    const user = this.getUser();
-    const roles = Array.isArray(allowedRoles) ? allowedRoles : [allowedRoles];
+ require(allowedRoles) {
+  const user = this.getUser();
+  const roles = Array.isArray(allowedRoles) ? allowedRoles : [allowedRoles];
 
-    if (!user || !this.isTokenValid()) {
-      this.redirectToLogin('Session expired. Please login again.');
-      return false;
-    }
+  if (!user || !this.isTokenValid()) {
+    this.redirectToLogin('Session expired. Please login again.');
+    return false;
+  }
 
-    if (!roles.includes(user.role)) {
-      this.redirectToLogin(`Access denied. This page requires: ${roles.join(' or ')} role.`);
-      return false;
-    }
+  // Use the role inside the signed token, not the editable localStorage copy
+  const tokenRole = this.getTokenPayload()?.role;
+  if (!tokenRole || user.role !== tokenRole) {
+    // localStorage was edited or is inconsistent: wipe the session
+    localStorage.removeItem('nexora_token');
+    localStorage.removeItem('nexora_user');
+    this.redirectToLogin('Session invalid. Please login again.');
+    return false;
+  }
 
-    // Inject user info into page
-    this.injectUserBadge(user);
-    return true;
-  },
+  if (!roles.includes(tokenRole)) {
+    this.redirectToLogin(`Access denied. This page requires: ${roles.join(' or ')} role.`);
+    return false;
+  }
+
+  // Inject user info into page
+  this.injectUserBadge(user);
+  return true;
+},
 
   // ── SAVE SESSION ── stores the REAL token + user returned by the backend after login/verify-otp
   saveSession(token, user) {

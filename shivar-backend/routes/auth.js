@@ -3,7 +3,6 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
 const { sendOtpEmail, generateOtp } = require("../utils/sendEmail");
-const { requireAuth } = require("../middleware/auth");
 
 const router = express.Router();
 
@@ -17,13 +16,7 @@ const VALID_VEHICLE_TYPES = [
 
 function signToken(user) {
   return jwt.sign(
-    {
-      id: user._id,
-      role: user.role,
-      name: user.name,
-      mobile: user.mobile,
-      marketplaceId: user.marketplaceId || null,
-    },
+    { id: user._id, role: user.role, name: user.name, mobile: user.mobile },
     process.env.JWT_SECRET,
     { expiresIn: process.env.JWT_EXPIRES_IN || "7d" },
   );
@@ -33,12 +26,10 @@ function signToken(user) {
 function publicUser(user) {
   return {
     id: user._id,
-    marketplaceId: user.marketplaceId || null,
     name: user.name,
     role: user.role,
     mobile: user.mobile,
     email: user.email,
-    vibhagCluster: user.vibhagCluster,
     district: user.district,
     village: user.village,
     taluka: user.taluka,
@@ -253,63 +244,50 @@ router.post("/resend-otp", async (req, res) => {
   }
 });
 
-// ── LOGIN ── email, mobile, or marketplaceId (F0001, B0001) + password
+// ── LOGIN ── email or mobile + password
 router.post("/login", async (req, res) => {
   try {
-    const { identifier, password } = req.body;
+    const { identifier, password, role } = req.body;
     if (!identifier || !password) {
-      return res.status(400).json({ error: "Identifier and password are required" });
+      return res.status(400).json({ error: "Please fill all fields" });
+    }
+    if (!["farmer", "buyer", "logistics"].includes(role)) {
+      return res.status(400).json({ error: "Please select a portal to log in to" });
     }
 
-    const cleanId = String(identifier).trim();
-    const digits = cleanId.replace(/\D/g, "");
-
-    const searchConditions = [
-      { email: cleanId.toLowerCase() },
-      { mobile: cleanId },
-      { marketplaceId: cleanId.toUpperCase() },
-    ];
-
-    if (digits.length === 10) {
-      searchConditions.push({ mobile: `+91${digits}` }, { mobile: digits });
-    }
-
-    const user = await User.findOne({ $or: searchConditions });
-
+    const id = String(identifier).trim();
+    const user = await User.findOne({
+      $or: [
+        { email: id.toLowerCase() },
+        { mobile: id.replace(/\D/g, "").slice(-10) },
+      ],
+    });
     if (!user) return res.status(401).json({ error: "Invalid credentials" });
 
     const match = await bcrypt.compare(password, user.passwordHash);
     if (!match) return res.status(401).json({ error: "Invalid credentials" });
 
+    // ── ROLE CHECK (after password, so roles can't be probed without credentials) ──
+    if (user.role !== role) {
+      const labels = { farmer: "Farmer", buyer: "Buyer", logistics: "Logistics" };
+      return res.status(403).json({
+        error: `This account is registered as ${labels[user.role]}. Please log in from the ${labels[user.role]} portal.`,
+        code: "ROLE_MISMATCH",
+      });
+    }
+
     if (!user.isVerified) {
-      return res
-        .status(403)
-        .json({
-          error: "Email not verified",
-          userId: user._id,
-          needsVerification: true,
-        });
+      return res.status(403).json({
+        error: "Email not verified",
+        userId: user._id,
+        needsVerification: true,
+      });
     }
 
     const token = signToken(user);
-    res.json({
-      message: "Login successful",
-      token,
-      user: publicUser(user),
-    });
+    res.json({ message: "Login successful", token, user: publicUser(user) });
   } catch (err) {
     res.status(500).json({ error: "Login failed", detail: err.message });
-  }
-});
-
-// ── GET CURRENT USER ──
-router.get("/me", requireAuth, async (req, res) => {
-  try {
-    const user = await User.findById(req.user.id);
-    if (!user) return res.status(404).json({ error: "User not found" });
-    res.json({ user: publicUser(user) });
-  } catch (err) {
-    res.status(500).json({ error: "Failed to fetch user profile", detail: err.message });
   }
 });
 

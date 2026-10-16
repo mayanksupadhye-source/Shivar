@@ -15,9 +15,8 @@ const userSchema = new mongoose.Schema({
   mobile: {
     type: String,
     required: true,
-    trim: true,
-    // Accepts 10-digit Indian mobile with or without leading +91 or 0
-    match: [/^(?:\+91|0)?[6-9]\d{9}$/, 'Enter a valid 10-digit Indian mobile number'],
+    unique: true,
+    match: [/^[6-9]\d{9}$/, 'Enter a valid 10-digit Indian mobile number'],
   },
   email: {
     type: String,
@@ -29,54 +28,43 @@ const userSchema = new mongoose.Schema({
   },
   passwordHash: { type: String, required: true },
   role: { type: String, enum: ['farmer', 'buyer', 'logistics'], required: true },
-  
-  marketplaceId: {
-    type: String,
-    trim: true,
-    uppercase: true,
-  },
+  district: { type: String, default: 'India' },
 
-  // Agricultural / Geographic cluster info
-  vibhagCluster: { type: String, trim: true },
-  district: { type: String, default: 'India', trim: true },
-  taluka: { type: String, trim: true },
-  village: { type: String, trim: true },
-  primaryCrop: { type: String, trim: true },
-
-  // Email verification & OTP
+  // Email verified via OTP before account is usable
   isVerified: { type: Boolean, default: false },
   otpCode: { type: String },
   otpExpiresAt: { type: Date },
 
-  // Identity documents (display last 4 only)
+  // ── Identity (never store full Aadhaar — last 4 digits only) ──
   aadhaarLast4: { type: String },
   panNumber: { type: String },
 
-  // Farmer specific profile fields
-  state: { type: String, trim: true },
-  landRecord: { type: String, trim: true },
+  // ── Farmer profile fields (optional) ──
+  village: { type: String },
+  taluka: { type: String },
+  state: { type: String },
+  landRecord: { type: String },
+  primaryCrop: { type: String },
   landAreaAcres: { type: Number },
-  ownershipNo: { type: String, trim: true },
+  ownershipNo: { type: String },
 
-  // Buyer specific profile fields
-  companyName: { type: String, trim: true },
-  gstNumber: { type: String, trim: true },
-  industryType: { type: String, trim: true },
+  // ── Buyer profile fields (optional) ──
+  companyName: { type: String },
+  gstNumber: { type: String },
+  industryType: { type: String },
 
-  // Logistics partner specific fields
+  honourScore:   { type: Number, default: 50, min: 0, max: 100 },
+reviewedOrders:{ type: Number, default: 0 },
+isBlacklisted: { type: Boolean, default: false },
+blacklistedAt: { type: Date },
+
+  // ── Logistics Partner profile fields (optional) ──
+  // Plain text, entered once at signup, e.g. "Nashik, Maharashtra".
+  // Geocoded on-demand (see utils/geocode.js) rather than at signup time,
+  // so registration never blocks on an external API call.
   baseLocation: { type: String, trim: true },
   vehicles: { type: [vehicleSchema], default: undefined },
 
-}, {
-  timestamps: true,
-  toJSON: { virtuals: true },
-  toObject: { virtuals: true },
-});
-
-// Partial unique index for marketplaceId (only when non-null)
-userSchema.index({ marketplaceId: 1 }, { unique: true, sparse: true });
-
-// Compound unique index for mobile + role (allows 199 shared contacts between farmer and buyer roles)
-userSchema.index({ mobile: 1, role: 1 }, { unique: true });
+}, { timestamps: true });
 
 module.exports = mongoose.model('User', userSchema);
