@@ -152,7 +152,7 @@ router.post('/:id/claim', requireAuth, requireRole('logistics'), async (req, res
 router.put('/:id/status', requireAuth, async (req, res) => {
   try {
     const { status } = req.body;
-    const validStatuses = ['pending', 'confirmed', 'assigned', 'in_transit', 'delivered', 'completed', 'cancelled'];
+    const validStatuses = ['pending', 'confirmed', 'logistics_confirmed', 'assigned', 'in_transit', 'delivered', 'completed', 'cancelled'];
     if (!status || !validStatuses.includes(status)) {
       return res.status(400).json({ error: `Invalid status. Valid values: ${validStatuses.join(', ')}` });
     }

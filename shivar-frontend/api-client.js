@@ -93,6 +93,7 @@ const NexoraAPI = {
   },
   getTransaction(id) { return apiRequest(`/api/transactions/${id}`); },
   claimDelivery(id) { return apiRequest(`/api/transactions/${id}/claim`, { method: 'POST' }); },
+  confirmLogistics(id) { return apiRequest(`/api/logistics/transactions/${id}/confirm-logistics`, { method: 'POST' }); },
   updateTransactionStatus(id, status) { return apiRequest(`/api/transactions/${id}/status`, { method: 'PUT', body: { status } }); },
 
   // ══════════ CHAT & CONVERSATIONS ══════════

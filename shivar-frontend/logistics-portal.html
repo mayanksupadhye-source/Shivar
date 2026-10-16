@@ -154,6 +154,7 @@
       <button id="sortRecentBtn" class="active">Most Recent</button>
       <button id="sortDistanceBtn">Nearest to Me</button>
     </div>
+    <span id="gpsBadge" style="display:none; font-size:0.75rem; background:#DCFCE7; color:#15803D; font-weight:600; padding:4px 10px; border-radius:20px; border:1px solid #86EFAC;">📍 Locating…</span>
     <input type="text" id="cropFilter" placeholder="Filter by crop…" />
     <input type="text" id="districtFilter" placeholder="Filter by district…" />
     <button class="btn-secondary" id="applyFilterBtn">Apply</button>
@@ -245,6 +246,40 @@ async function authedFetch(path, opts = {}) {
   return data;
 }
 
+let detectedCoords = null;
+
+function initGeolocation() {
+  if (!navigator.geolocation) {
+    console.log('Geolocation not supported by this browser.');
+    return;
+  }
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      detectedCoords = {
+        lat: Math.round(pos.coords.latitude * 1000) / 1000,
+        lng: Math.round(pos.coords.longitude * 1000) / 1000,
+      };
+      const badge = document.getElementById('gpsBadge');
+      if (badge) {
+        badge.textContent = `📍 GPS Active (${detectedCoords.lat}°, ${detectedCoords.lng}°)`;
+        badge.style.display = 'inline-block';
+      }
+      if (sortMode === 'distance') {
+        loadTransactions();
+      }
+    },
+    (err) => {
+      console.log('Geolocation note: permission denied or timed out. Falling back to base location.');
+      const badge = document.getElementById('gpsBadge');
+      if (badge) {
+        badge.textContent = '📍 Profile Base Location';
+        badge.style.display = 'inline-block';
+      }
+    },
+    { timeout: 8000, maximumAge: 60000, enableHighAccuracy: false }
+  );
+}
+
 async function loadTransactions() {
   const grid = document.getElementById('txGrid');
   grid.innerHTML = '<p style="color:var(--text-muted); grid-column:1/-1;">Loading…</p>';
@@ -255,7 +290,12 @@ async function loadTransactions() {
   let data;
   try {
     if (sortMode === 'distance') {
-      data = await authedFetch(`/transactions/sorted-by-distance?page=${currentPage}&limit=${PAGE_SIZE}`);
+      const params = new URLSearchParams({ page: currentPage, limit: PAGE_SIZE });
+      if (detectedCoords) {
+        params.set('lat', detectedCoords.lat);
+        params.set('lng', detectedCoords.lng);
+      }
+      data = await authedFetch(`/transactions/sorted-by-distance?${params}`);
     } else {
       const params = new URLSearchParams({ page: currentPage, limit: PAGE_SIZE });
       if (crop) params.set('crop', crop);
@@ -289,16 +329,34 @@ function renderGrid(transactions) {
 
   loadedTransactionsMap = new Map(transactions.map((t) => [String(t._id), t]));
 
-  grid.innerHTML = transactions.map((t) => `
-    <div class="tx-card" data-id="${t._id}">
-      <div class="crop">${escapeHtml(t.crop || '—')}</div>
-      <div class="variety">${escapeHtml(t.variety || '')}</div>
-      <div class="row"><span>Quantity</span><span>${t.quantity_tons ?? '—'} tons</span></div>
-      <div class="row"><span>Price/qtl</span><span>₹${t.agreed_price_per_quintal ?? '—'}</span></div>
-      <div class="route">📍 ${escapeHtml(t.pickup_location || '')}<br>➡️ ${escapeHtml(t.delivery_location || '')}</div>
-      ${t.distanceFromBaseKm != null ? `<div class="distance-badge">${t.distanceFromBaseKm} km from your base</div>` : ''}
-    </div>
-  `).join('');
+  grid.innerHTML = transactions.map((t) => {
+    const sacks = t.sacks_count || Math.max(1, Math.round((t.quantity_tons || 1) * 20));
+    let statusBadge = '';
+    if (t.status === 'logistics_confirmed' || t.status === 'assigned') {
+      statusBadge = `<span style="font-size:0.75rem; background:#DCFCE7; color:#15803D; font-weight:700; padding:2px 8px; border-radius:12px; border:1px solid #86EFAC;">✅ Logistics Confirmed</span>`;
+    } else if (t.status === 'confirmed') {
+      statusBadge = `<span style="font-size:0.75rem; background:#FEF3C7; color:#B45309; font-weight:700; padding:2px 8px; border-radius:12px; border:1px solid #FCD34D;">⏳ Confirmed Deal</span>`;
+    }
+
+    const distLabel = detectedCoords ? 'away' : 'from your base';
+    const distBadge = t.distanceFromBaseKm != null ? `<div class="distance-badge">📍 ${t.distanceFromBaseKm} km ${distLabel}</div>` : '';
+    const codeBadge = t.shipment_code ? `<div style="font-size:0.8rem; font-weight:700; color:#047857; margin-top:0.35rem; display:flex; align-items:center; gap:0.3rem;">🏷️ Code: <span style="font-family:monospace; background:#ECFDF5; padding:1px 6px; border-radius:4px; border:1px solid #A7F3D0;">${escapeHtml(t.shipment_code)}</span></div>` : '';
+
+    return `
+      <div class="tx-card" data-id="${t._id}">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:0.25rem;">
+          <div class="crop">${escapeHtml(t.crop || '—')}</div>
+          ${statusBadge}
+        </div>
+        <div class="variety">${escapeHtml(t.variety || '')}</div>
+        <div class="row"><span>Quantity</span><span>${t.quantity_tons ?? '—'} tons (~${sacks} Sacks)</span></div>
+        <div class="row"><span>Price/qtl</span><span>₹${t.agreed_price_per_quintal ?? '—'}</span></div>
+        <div class="route">📍 ${escapeHtml(t.pickup_location || '')}<br>➡️ ${escapeHtml(t.delivery_location || '')}</div>
+        ${codeBadge}
+        ${distBadge}
+      </div>
+    `;
+  }).join('');
 
   grid.querySelectorAll('.tx-card').forEach((card) => {
     card.addEventListener('click', () => openTransaction(card.dataset.id));
@@ -358,12 +416,43 @@ function renderModalInitial(tx) {
 
   const farmerName = tx.farmer?.name || tx.farmerName || 'Farmer';
   const buyerName = tx.buyer?.name || tx.buyer?.companyName || tx.buyerName || 'Buyer';
+  const sacks = tx.sacks_count || Math.max(1, Math.round((tx.quantity_tons || 1) * 20));
+
+  const isConfirmed = Boolean(tx.shipment_code || tx.status === 'logistics_confirmed' || tx.status === 'assigned');
+
+  const statusActionHtml = isConfirmed ? `
+    <div style="background:#ECFDF5; border:1.5px solid #10B981; border-radius:12px; padding:1rem 1.2rem; margin-bottom:1rem;">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <span style="font-weight:700; color:#065F46; font-size:1.05rem;">✅ Logistics Confirmed</span>
+        <span style="font-size:0.75rem; background:#D1FAE5; color:#047857; font-weight:700; padding:2px 8px; border-radius:12px;">Active Assignment</span>
+      </div>
+      <div style="margin-top:0.5rem; display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap;">
+        <span style="font-size:0.85rem; color:#064E3B; font-weight:600;">Shipment Code:</span>
+        <span style="font-family:monospace; font-size:1.15rem; font-weight:800; background:#fff; color:#047857; padding:2px 10px; border-radius:6px; border:1.5px solid #059669; letter-spacing:1px;">${escapeHtml(tx.shipment_code || 'SHV-ASSIGNED')}</span>
+      </div>
+      <div style="font-size:0.82rem; color:#047857; margin-top:0.5rem; line-height:1.4;">
+        📦 <strong>Physical Traceability:</strong> Farmer instructed to write this code on every <strong>Sack (Gunny Bag)</strong> (~${sacks} sacks). Buyer will verify code upon physical delivery.
+      </div>
+    </div>
+  ` : `
+    <div style="background:#FFFBEB; border:1.5px solid #FCD34D; border-radius:12px; padding:0.9rem 1.2rem; margin-bottom:1rem; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.8rem;">
+      <div>
+        <div style="font-weight:700; color:#92400E; font-size:0.95rem;">📋 Confirmed Deal Ready for Logistics</div>
+        <div style="font-size:0.8rem; color:#B45309; margin-top:0.2rem;">Physical volume: ~${sacks} Sacks (Gunny Bags)</div>
+      </div>
+      <button id="confirmLogisticsBtn" style="background:#15803D; color:#fff; border:none; border-radius:8px; padding:0.65rem 1.25rem; font-weight:700; font-size:0.92rem; cursor:pointer; box-shadow:0 2px 8px rgba(21,128,61,0.25); display:inline-flex; align-items:center; gap:0.4rem;">
+        🚚 Confirm Logistics
+      </button>
+    </div>
+  `;
 
   document.getElementById('modalBody').innerHTML = `
+    ${statusActionHtml}
+
     <div style="background:var(--sand); border-radius:12px; padding:1rem 1.2rem; margin-bottom:1rem; border:1px solid var(--line);">
       <div style="font-weight:700; color:var(--leaf-deep); font-size:1.1rem; margin-bottom:0.3rem;">${escapeHtml(tx.crop || 'Produce')} ${tx.variety ? `· ${escapeHtml(tx.variety)}` : ''}</div>
       <div style="font-size:0.85rem; color:var(--text-muted); margin-bottom:0.5rem;">
-        Quantity: <strong>${tx.quantity_tons ?? '—'} tons</strong> &nbsp;|&nbsp; Agreed Price: <strong>₹${tx.agreed_price_per_quintal ?? '—'}/qtl</strong>
+        Quantity: <strong>${tx.quantity_tons ?? '—'} tons (~${sacks} Sacks)</strong> &nbsp;|&nbsp; Agreed Price: <strong>₹${tx.agreed_price_per_quintal ?? '—'}/qtl</strong>
       </div>
       <div style="font-size:0.82rem; line-height:1.5;">
         <div>📍 <strong>Pickup:</strong> ${escapeHtml(pickup)} (👨‍🌾 ${escapeHtml(farmerName)})</div>
@@ -386,6 +475,48 @@ function renderModalInitial(tx) {
 
   document.getElementById('msgFarmerBtn').onclick = () => openChat(currentTransaction.id, getFarmerTarget(), 'farmer');
   document.getElementById('msgBuyerBtn').onclick = () => openChat(currentTransaction.id, getBuyerTarget(), 'buyer');
+
+  const confirmBtn = document.getElementById('confirmLogisticsBtn');
+  if (confirmBtn) {
+    confirmBtn.onclick = async () => {
+      const confirmAction = window.confirm(
+        `Confirm Logistics for this transaction?\n\n` +
+        `• Produce: ${tx.crop || 'Produce'} (${tx.quantity_tons || 1} tons)\n` +
+        `• Pickup: ${pickup}\n` +
+        `• Delivery: ${delivery}\n\n` +
+        `By confirming:\n` +
+        `1. You accept pickup and delivery responsibility.\n` +
+        `2. A unique Shipment Identification Code (SHV-XXXX-X) will be generated.\n` +
+        `3. The farmer will be instructed to write this code on all Sacks (Gunny Bags).\n` +
+        `4. Both Buyer and Farmer will be notified in chat.`
+      );
+      if (!confirmAction) return;
+
+      confirmBtn.disabled = true;
+      confirmBtn.textContent = 'Confirming…';
+
+      try {
+        const res = await authedFetch(`/transactions/${currentTransaction.id}/confirm-logistics`, {
+          method: 'POST',
+        });
+        alert(`✅ Logistics Confirmed!\n\nShipment Code: ${res.shipment_code}\n\nFarmer and Buyer have been notified via messaging.`);
+        currentTransaction = {
+          ...currentTransaction,
+          ...res.transaction,
+          shipment_code: res.shipment_code,
+          sacks_count: res.sacks_count,
+          status: 'logistics_confirmed',
+        };
+        loadedTransactionsMap.set(String(currentTransaction.id), currentTransaction);
+        renderModalInitial(currentTransaction);
+        loadTransactions();
+      } catch (err) {
+        alert('Could not confirm logistics: ' + err.message);
+        confirmBtn.disabled = false;
+        confirmBtn.textContent = '🚚 Confirm Logistics';
+      }
+    };
+  }
 }
 
 function renderModalGeocode(data) {
@@ -535,6 +666,7 @@ function sendChatMessage() {
 }
 
 // ── Init ──
+initGeolocation();
 loadTransactions();
 </script>
 </body>

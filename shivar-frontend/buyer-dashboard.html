@@ -2000,7 +2000,9 @@
       function mapBackendOrder(o) {
         const statusMap = {
           confirmed: "Confirmed",
+          logistics_confirmed: "Logistics Confirmed",
           assigned: "In Transit",
+          in_transit: "In Transit",
           shipped: "In Transit",
           completed: "Delivered",
           cancelled: "Cancelled",
@@ -2008,15 +2010,19 @@
         const cropName = o.crop || o.listing?.crop || "Produce";
         const qty = o.quantity_tons ?? o.quantity ?? 1;
         const price = o.agreed_price_per_quintal ?? o.finalPrice ?? 0;
+        const sacks = o.sacks_count || Math.max(1, Math.round(qty * 20));
         return {
           id: o._id,
           isReal: true,
-          crop: `${cropName} · ${qty} tons`,
+          crop: `${cropName} · ${qty} tons (~${sacks} Sacks)`,
           farmer: o.farmer?.name || "Farmer",
           location: o.pickup_location || o.farmer?.district || "",
           amount: "₹" + Number(price * qty).toLocaleString("en-IN"),
           date: new Date(o.createdAt || o.transaction_date || Date.now()).toLocaleDateString("en-IN"),
           status: statusMap[o.status] || "Confirmed",
+          shipmentCode: o.shipment_code || null,
+          sacksCount: sacks,
+          logisticsPartner: o.logisticsPartner?.name || null,
         };
       }
 
@@ -2046,12 +2052,14 @@
         }
 
         const statusClass = {
+          "Logistics Confirmed": "os-transit",
           "In Transit": "os-transit",
           Delivered: "os-delivered",
           Confirmed: "os-pending",
           Cancelled: "os-declined",
         };
         const statusIcon = {
+          "Logistics Confirmed": "🚚",
           "In Transit": "🚛",
           Delivered: "✅",
           Confirmed: "📋",
@@ -2064,6 +2072,15 @@
       <div class="order-info">
         <h5>${escapeHtml(o.crop)}</h5>
         <p>👨‍🌾 ${escapeHtml(o.farmer)} · 📍 ${escapeHtml(o.location || "")} · ${o.date}</p>
+        ${
+          o.shipmentCode
+            ? `
+          <div style="margin-top:0.35rem; font-size:0.8rem; background:#ECFDF5; color:#065F46; padding:3px 8px; border-radius:6px; border:1px solid #10B981; display:inline-flex; align-items:center; gap:0.4rem; flex-wrap:wrap;">
+            🏷️ <strong>Shipment Code:</strong> <span style="font-family:monospace; font-weight:800; background:#fff; padding:1px 6px; border-radius:4px; border:1px solid #059669;">${escapeHtml(o.shipmentCode)}</span>
+            <span style="font-size:0.75rem; color:#047857;">(Verify physical Sacks / Gunny Bags upon arrival)</span>
+          </div>`
+            : ""
+        }
       </div>
       <div class="order-right">
         <div class="order-amount">${o.amount}</div>

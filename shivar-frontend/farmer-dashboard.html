@@ -1891,6 +1891,21 @@
         <div style="font-size:0.88rem;font-weight:600;">${b.buyer?.name || "Buyer"}${b.buyer?.companyName ? " · " + b.buyer.companyName : ""}</div>
         <div style="font-size:0.78rem;color:var(--muted)">${b.listing?.crop || ""} · ${b.quantity} qtl${b.buyer?.district ? " · " + b.buyer.district : ""}</div>
         ${b.message ? `<div style="font-size:0.76rem;color:var(--muted);margin-top:0.2rem;font-style:italic;">"${b.message}"</div>` : ""}
+        ${
+          b.transaction?.shipment_code
+            ? `
+          <div style="margin-top:0.4rem; background:#ECFDF5; border:1px solid #10B981; border-radius:8px; padding:0.4rem 0.6rem; font-size:0.78rem; color:#065F46;">
+            <div style="display:flex; align-items:center; gap:0.4rem; font-weight:700; flex-wrap:wrap;">
+              <span>🏷️ Shipment Code:</span>
+              <span style="font-family:monospace; background:#fff; padding:1px 6px; border-radius:4px; border:1px solid #059669; font-size:0.85rem;">${escapeHtml(b.transaction.shipment_code)}</span>
+              <span style="font-size:0.72rem; color:#047857;">(~${b.transaction.sacks_count || Math.max(1, Math.round((b.quantity || 1) * 2))} Sacks (Gunny Bags))</span>
+            </div>
+            <div style="margin-top:0.25rem; font-size:0.75rem; color:#047857; font-weight:500;">
+              ⚠️ <strong>Physical Traceability:</strong> Please write <strong>${escapeHtml(b.transaction.shipment_code)}</strong> clearly on every <strong>Sack (Gunny Bag)</strong> included in this shipment.
+            </div>
+          </div>`
+            : ""
+        }
       </div>
       <div>
         <div class="bid-price">₹${Number(b.offerPrice).toLocaleString("en-IN")}</div>

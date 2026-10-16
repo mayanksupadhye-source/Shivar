@@ -54,9 +54,28 @@ const transactionSchema = new mongoose.Schema({
 
   status: {
     type: String,
-    enum: ['pending', 'confirmed', 'assigned', 'in_transit', 'delivered', 'completed', 'cancelled'],
+    enum: ['pending', 'confirmed', 'logistics_confirmed', 'assigned', 'in_transit', 'delivered', 'completed', 'cancelled'],
     default: 'confirmed',
     index: true,
+  },
+
+  // Unique shipment/batch identification code (e.g. SHV-7B3-4)
+  shipment_code: {
+    type: String,
+    unique: true,
+    sparse: true,
+    trim: true,
+    uppercase: true,
+    index: true,
+  },
+  logistics_confirmed_at: {
+    type: Date,
+    default: null,
+  },
+  // Physical sacks/gunny bags count for traceability
+  sacks_count: {
+    type: Number,
+    default: null,
   },
 
   // Linked bid (if originated from a marketplace bid)

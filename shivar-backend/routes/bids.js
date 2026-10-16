@@ -46,6 +46,7 @@ router.get('/my', requireAuth, requireRole('buyer'), async (req, res) => {
     const bids = await Bid.find({ buyer: req.user.id })
       .populate('listing')
       .populate('farmer', 'name district mobile')
+      .populate('transaction', 'transaction_id status shipment_code sacks_count')
       .sort({ createdAt: -1 });
     res.json(bids);
   } catch (err) {
@@ -59,6 +60,7 @@ router.get('/mine', requireAuth, requireRole('farmer'), async (req, res) => {
     const bids = await Bid.find({ farmer: req.user.id })
       .populate('listing')
       .populate('buyer', 'name district mobile companyName')
+      .populate('transaction', 'transaction_id status shipment_code sacks_count')
       .sort({ createdAt: -1 });
     res.json(bids);
   } catch (err) {

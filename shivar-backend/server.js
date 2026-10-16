@@ -33,6 +33,7 @@ const io = new Server(server, {
   cors: { origin: process.env.CLIENT_URL || '*' },
 });
 initUnifiedSocket(io);
+app.set('io', io);
 
 // ── Routes ──
 app.use('/api/auth', authRoutes);
