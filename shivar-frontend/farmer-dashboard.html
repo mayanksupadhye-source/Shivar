@@ -721,6 +721,24 @@
 
       <!-- ══════════ OVERVIEW ══════════ -->
       <div id="panel-overview" class="panel active">
+        <!-- HONOUR SCORE (changes with buyer feedback) -->
+        <div class="card" id="honour-card" style="display:flex;gap:1.5rem;align-items:center;flex-wrap:wrap;">
+          <div style="text-align:center;min-width:130px;">
+            <div class="metric-label">🏅 Honour Score</div>
+            <div class="metric-val gold" id="honour-score">--</div>
+            <div id="honour-tier" style="font-size:0.78rem;color:var(--muted);">Loading…</div>
+          </div>
+          <div style="flex:1;min-width:240px;">
+            <div style="height:10px;border-radius:6px;background:rgba(21,128,61,0.15);overflow:hidden;">
+              <div id="honour-bar" style="height:100%;width:0%;background:linear-gradient(90deg,var(--leaf),var(--lime));transition:width 0.6s;"></div>
+            </div>
+            <div style="font-size:0.8rem;color:var(--muted);margin-top:0.5rem;">
+              Good buyer feedback (3 stars or more) raises your score. Poor feedback (2 stars or less) lowers it.
+            </div>
+            <div id="honour-recent" style="font-size:0.78rem;color:var(--muted);margin-top:0.4rem;"></div>
+          </div>
+        </div>
+
         <div class="metrics">
           <div class="metric-card glow-border">
             <div class="metric-label">Total Earnings</div>
@@ -1555,10 +1573,63 @@
         refreshCounts();
         loadListingsTable();
         loadBidsPanel();
+        loadHonour();
         await loadConversationsFromBids();
         renderMessages();
         NexoraSocket.onMessage(handleIncomingMessage);
       });
+
+            // ── HONOUR SCORE ── fresh from the backend; buyer feedback changes it
+      const HONOUR_API_BASE = window.NEXORA_API_BASE || "http://localhost:5000";
+      async function loadHonour() {
+        const scoreEl = document.getElementById("honour-score");
+        if (!scoreEl) return;
+        try {
+          const res = await fetch(HONOUR_API_BASE + "/api/orders/honour/me", {
+            headers: { Authorization: "Bearer " + AuthGuard.getToken() },
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || "Could not load honour score");
+          window.__honour = data;
+
+          const score = Math.round(Number(data.honourScore));
+          scoreEl.textContent = score;
+          const bar = document.getElementById("honour-bar");
+          bar.style.width = score + "%";
+          bar.style.background =
+            score < 40
+              ? "linear-gradient(90deg,#DC2626,#F87171)"
+              : "linear-gradient(90deg,var(--leaf),var(--lime))";
+
+          let tier = "Watch";
+          if (score >= 90) tier = "Platinum";
+          else if (score >= 80) tier = "Gold";
+          else if (score >= 60) tier = "Silver";
+          else if (score >= 40) tier = "Bronze";
+          const reviews = Number(data.reviewedOrders) || 0;
+          let tierText = tier + " · " + reviews + (reviews === 1 ? " review" : " reviews");
+          if (reviews < 3) tierText = "Building trust · " + reviews + (reviews === 1 ? " review" : " reviews");
+          if (data.isBlacklisted) tierText = "⛔ Blacklisted — you cannot list new crops";
+          document.getElementById("honour-tier").textContent = tierText;
+          document.getElementById("honour-tier").style.color = data.isBlacklisted ? "var(--red)" : "var(--muted)";
+
+          const recent = (data.recent || [])
+            .map(function (f) {
+              const up = Number(f.average) >= 2.5;
+              return (up ? "⬆️ " : "⬇️ ") + f.quality + " · " + f.packaging + " · " + f.honesty + " stars";
+            })
+            .join("   ");
+          document.getElementById("honour-recent").textContent = recent
+            ? "Latest reviews (quality · packaging · honesty): " + recent
+            : "No buyer reviews yet.";
+
+          updateProfilePanel(AuthGuard.getUser());
+        } catch (err) {
+          document.getElementById("honour-tier").textContent = "Could not load: " + err.message;
+        }
+      }
+      window.addEventListener("focus", loadHonour);
+      setInterval(loadHonour, 20000);
 
       // ── PANEL NAVIGATION ──
       function showPanel(id) {
@@ -2197,6 +2268,7 @@
           ["State", user.state || "Maharashtra"],
           ["Village", user.village || "Dindori"],
           ["Primary Crop", user.crop || "Cotton"],
+          ["Honour Score", window.__honour ? Math.round(window.__honour.honourScore) + " / 100" : "Loading..."],
           [
             "Registered",
             user.registeredAt

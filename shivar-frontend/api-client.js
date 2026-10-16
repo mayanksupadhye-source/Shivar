@@ -41,7 +41,7 @@ const NexoraAPI = {
   signup(payload) { return apiRequest('/api/auth/signup', { method: 'POST', body: payload, auth: false }); },
   verifyOtp(userId, otp) { return apiRequest('/api/auth/verify-otp', { method: 'POST', body: { userId, otp }, auth: false }); },
   resendOtp(userId) { return apiRequest('/api/auth/resend-otp', { method: 'POST', body: { userId }, auth: false }); },
- login(identifier, password, role) { return apiRequest('/api/auth/login', { method: 'POST', body: { identifier, password, role }, auth: false }); },
+  login(identifier, password, role) { return apiRequest('/api/auth/login', { method: 'POST', body: { identifier, password, role }, auth: false }); },
 
   // ══════════ LISTINGS ══════════
   getListings(params = {}) {
@@ -65,6 +65,8 @@ const NexoraAPI = {
   // ══════════ ORDERS ══════════
   getMyOrders() { return apiRequest('/api/orders/my'); },
   updateOrderStatus(orderId, status) { return apiRequest(`/api/orders/${orderId}/status`, { method: 'PUT', body: { status } }); },
+  // NEW: buyer confirms receipt + compulsory ratings. ratings = { quality, packaging, honesty } (whole numbers 1-5)
+  markOrderReceived(orderId, ratings) { return apiRequest(`/api/orders/${orderId}/received`, { method: 'PUT', body: ratings }); },
 
   // ══════════ CHAT (history) ══════════
   getChatHistory(listingId, otherUserId) { return apiRequest(`/api/chat/${listingId}/${otherUserId}`); },

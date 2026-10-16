@@ -874,6 +874,14 @@
         font-weight: 700;
       }
 
+            /* FEEDBACK STARS */
+      .fb-row { display:flex; justify-content:space-between; align-items:center; padding:0.5rem 0; }
+      .fb-row .fb-label { font-size:0.9rem; font-weight:600; }
+      .fb-stars { display:flex; gap:0.15rem; }
+      .fb-star { font-size:1.7rem; cursor:pointer; color:rgba(82,107,97,0.3); transition:transform 0.1s, color 0.1s; user-select:none; }
+      .fb-star.on { color:var(--gold); }
+      .fb-star:hover { transform:scale(1.15); }
+      .btn[disabled] { opacity:0.45; cursor:not-allowed; transform:none !important; box-shadow:none !important; }
       /* TOAST */
       .toast {
         position: fixed;
@@ -1661,6 +1669,19 @@
       </div>
     </div>
 
+        <!-- FEEDBACK MODAL (compulsory, no cancel button) -->
+    <div class="modal-overlay" id="feedback-modal">
+      <div class="modal">
+        <h3>Order Received 📦</h3>
+        <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:1rem">
+          Please rate this delivery to confirm receipt. All three ratings are required.
+        </p>
+        <div id="feedback-rows"></div>
+        <div class="modal-actions">
+          <button class="btn btn-green" id="feedback-submit" style="flex:1" disabled onclick="submitFeedback()">Submit Feedback →</button>
+        </div>
+      </div>
+    </div>
     <!-- TOAST -->
     <div class="toast" id="toast">
       <span>✅</span>
@@ -1853,6 +1874,8 @@
           status: statusMap[b.status] || "Pending",
           listingId: b.listing?._id,
           farmerId: b.farmer?._id,
+                    honour: b.farmer?.honourScore,
+          blacklisted: !!b.farmer?.isBlacklisted,
         };
       }
 
@@ -1904,7 +1927,7 @@
             (b) => `
     <tr>
       <td style="font-weight:600">${b.crop}</td>
-      <td>👨‍🌾 ${b.farmer}</td>
+      <td>👨‍🌾 ${b.farmer} ${b.honour != null ? `<span class="badge badge-gold" title="Honour Score">🏅 ${Math.round(b.honour)}</span>` : ""}${b.blacklisted ? ` <span class="badge" style="background:rgba(220,38,38,0.2);color:#DC2626">Blacklisted</span>` : ""}</td>
       <td style="color:var(--text-muted)">📍 ${b.location}</td>
       <td style="color:var(--text-muted)">${b.listed}</td>
       <td style="color:var(--gold);font-weight:700">${b.myBid}</td>
@@ -1959,6 +1982,72 @@
       // ════════════════════════════════
       // ORDERS DATA & RENDERING
       // ════════════════════════════════
+            // ════════════════════════════════
+      // ORDER FEEDBACK (compulsory)
+      // ════════════════════════════════
+      let feedbackOrderId = null;
+      const feedbackRatings = { quality: 0, packaging: 0, honesty: 0 };
+      const FEEDBACK_ROWS = [
+        ["quality", "Quality of crop"],
+        ["packaging", "Packaging"],
+        ["honesty", "Honesty"],
+      ];
+
+      function paintStars(key, n) {
+        document.querySelectorAll("#fb-stars-" + key + " .fb-star").forEach((s) => {
+          s.classList.toggle("on", Number(s.dataset.val) <= n);
+        });
+      }
+
+      function openFeedback(orderId) {
+        feedbackOrderId = orderId;
+        FEEDBACK_ROWS.forEach(([k]) => (feedbackRatings[k] = 0));
+        document.getElementById("feedback-rows").innerHTML = FEEDBACK_ROWS.map(
+          ([key, label]) => `
+          <div class="fb-row">
+            <span class="fb-label">${label}</span>
+            <div class="fb-stars" id="fb-stars-${key}">
+              ${[1, 2, 3, 4, 5].map((v) => `<span class="fb-star" data-val="${v}">★</span>`).join("")}
+            </div>
+          </div>`,
+        ).join("");
+
+        FEEDBACK_ROWS.forEach(([key]) => {
+          const box = document.getElementById("fb-stars-" + key);
+          box.addEventListener("mouseover", (e) => {
+            const s = e.target.closest(".fb-star");
+            if (s) paintStars(key, Number(s.dataset.val)); // hover preview
+          });
+          box.addEventListener("mouseleave", () => paintStars(key, feedbackRatings[key]));
+          box.addEventListener("click", (e) => {
+            const s = e.target.closest(".fb-star");
+            if (!s) return;
+            feedbackRatings[key] = Number(s.dataset.val); // clicking Nth star fills 1..N
+            paintStars(key, feedbackRatings[key]);
+            document.getElementById("feedback-submit").disabled = !FEEDBACK_ROWS.every(
+              ([k]) => feedbackRatings[k] >= 1,
+            );
+          });
+        });
+        document.getElementById("feedback-submit").disabled = true;
+        document.getElementById("feedback-modal").classList.add("show");
+      }
+
+      async function submitFeedback() {
+        const btn = document.getElementById("feedback-submit");
+        if (!FEEDBACK_ROWS.every(([k]) => feedbackRatings[k] >= 1)) return;
+        btn.disabled = true;
+        try {
+          await NexoraAPI.markOrderReceived(feedbackOrderId, { ...feedbackRatings });
+          document.getElementById("feedback-modal").classList.remove("show");
+          feedbackOrderId = null;
+          renderOrders();
+          showToast("⭐ Thank you! Order marked as received.");
+        } catch (err) {
+          btn.disabled = false;
+          showToast("❌ " + err.message);
+        }
+      }
       const defaultOrders = [
         {
           id: 1,
@@ -2016,6 +2105,8 @@
             "₹" + Number(o.finalPrice * o.quantity).toLocaleString("en-IN"),
           date: new Date(o.createdAt).toLocaleDateString("en-IN"),
           status: statusMap[o.status] || "Confirmed",
+                    rawStatus: o.status,
+          feedbackGiven: !!o.feedbackGiven,
         };
       }
 
@@ -2064,6 +2155,8 @@
       <div class="order-right">
         <div class="order-amount">${o.amount}</div>
         <span class="order-status ${statusClass[o.status] || "os-pending"}">${statusIcon[o.status] || "📋"} ${o.status}</span>
+                ${o.isReal && !o.feedbackGiven && ["confirmed", "shipped"].includes(o.rawStatus) ? `<div style="margin-top:0.5rem"><button class="small-btn small-btn-green" onclick="openFeedback('${o.id}')">📦 Order Received</button></div>` : ""}
+        ${o.isReal && o.feedbackGiven ? `<div style="margin-top:0.5rem;font-size:0.75rem;color:var(--gold)">⭐ Feedback given</div>` : ""}
       </div>
     </div>`,
           )
