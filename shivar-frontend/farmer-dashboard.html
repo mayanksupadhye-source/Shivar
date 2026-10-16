@@ -690,6 +690,7 @@
         <li><a href="#" onclick="showPanel('market')">📈 Market Intelligence</a></li>
         <li><a href="#" onclick="showPanel('climate')">🌦️ Climate Intelligence</a></li>
         <li><a href="#" onclick="showPanel('ecosystem')">🌱 Ecosystem Intelligence</a></li>
+        <li><a href="#" onclick="showPanel('mandi')">🏪 Mandi Prices</a></li>
       </ul>
       <button class="logout-btn" data-action="logout">🚪 Logout</button>
       <div class="sidebar-user">
@@ -717,6 +718,7 @@
         <div class="ptab" onclick="showPanel('market')">📈 Market Intel</div>
         <div class="ptab" onclick="showPanel('climate')">🌦️ Climate</div>
         <div class="ptab" onclick="showPanel('ecosystem')">🌱 Ecosystem</div>
+        <div class="ptab" onclick="showPanel('mandi')">🏪 Mandi Prices</div>
       </div>
 
       <!-- ══════════ OVERVIEW ══════════ -->
@@ -1488,6 +1490,112 @@
         </div>
       </div>
 
+      <!-- ══════════ MANDI PRICES ══════════ -->
+      <div id="panel-mandi" class="panel">
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">🏪 Live Mandi Prices</span>
+            <span class="badge badge-gold" id="mandi-data-badge">Daily — AGMARKNET</span>
+          </div>
+          <p style="font-size:0.85rem;color:var(--muted);margin-bottom:1rem;">
+            Daily wholesale prices reported by APMC mandis across India, sourced via
+            <strong>data.gov.in</strong> (Ministry of Agriculture / AGMARKNET).
+            Prices are in <strong>₹ per Quintal</strong> and updated once per trading day.
+          </p>
+
+          <!-- FILTERS -->
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:0.8rem;margin-bottom:1rem;">
+            <div class="fg">
+              <label style="font-size:0.78rem;color:var(--muted);">State</label>
+              <select id="mandi-state" style="width:100%;background:rgba(220,252,231,0.8);border:1px solid rgba(21,128,61,0.25);border-radius:8px;padding:0.5rem 0.7rem;font-family:'DM Sans',sans-serif;font-size:0.85rem;color:var(--cream);">
+                <option value="">All States</option>
+                <option value="Maharashtra" selected>Maharashtra</option>
+              </select>
+            </div>
+            <div class="fg">
+              <label style="font-size:0.78rem;color:var(--muted);">District</label>
+              <input type="text" id="mandi-district" placeholder="e.g. Nashik" style="width:100%;background:rgba(220,252,231,0.8);border:1px solid rgba(21,128,61,0.25);border-radius:8px;padding:0.5rem 0.7rem;font-family:'DM Sans',sans-serif;font-size:0.85rem;color:var(--cream);"/>
+            </div>
+            <div class="fg">
+              <label style="font-size:0.78rem;color:var(--muted);">Commodity</label>
+              <input type="text" id="mandi-commodity" placeholder="e.g. Onion, Soyabean" style="width:100%;background:rgba(220,252,231,0.8);border:1px solid rgba(21,128,61,0.25);border-radius:8px;padding:0.5rem 0.7rem;font-family:'DM Sans',sans-serif;font-size:0.85rem;color:var(--cream);"/>
+            </div>
+            <div class="fg" style="display:flex;align-items:flex-end;">
+              <button class="btn btn-green" style="width:100%;padding:0.55rem 1rem;" onclick="loadMandiPrices()">
+                🔍 Search Mandis
+              </button>
+            </div>
+          </div>
+
+          <!-- STATUS -->
+          <div id="mandi-status" style="display:none;text-align:center;padding:2rem 1rem;">
+            <div style="font-size:2.5rem;margin-bottom:0.8rem;">📊</div>
+            <p style="color:var(--muted);font-size:0.9rem;">Loading mandi prices...</p>
+          </div>
+
+          <!-- ERROR -->
+          <div id="mandi-error" style="display:none;text-align:center;padding:2rem 1rem;">
+            <div style="font-size:2.5rem;margin-bottom:0.8rem;">⚠️</div>
+            <p id="mandi-error-msg" style="color:var(--red);font-size:0.9rem;">Error loading data</p>
+            <button class="btn btn-outline" style="margin-top:1rem;" onclick="loadMandiPrices()">🔄 Retry</button>
+          </div>
+
+          <!-- TABLE -->
+          <div id="mandi-table-wrap" style="overflow-x:auto;">
+            <table class="crop-table" id="mandi-table" style="display:none;">
+              <thead>
+                <tr>
+                  <th>Commodity</th>
+                  <th>Variety</th>
+                  <th>State</th>
+                  <th>Market</th>
+                  <th style="text-align:right;">Min ₹/Q</th>
+                  <th style="text-align:right;">Max ₹/Q</th>
+                  <th style="text-align:right;font-weight:700;">Modal ₹/Q</th>
+                  <th>Date</th>
+                </tr>
+              </thead>
+              <tbody id="mandi-tbody"></tbody>
+            </table>
+          </div>
+
+          <!-- PAGINATION -->
+          <div id="mandi-pagination" style="display:none;margin-top:1rem;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;">
+            <span id="mandi-result-count" style="font-size:0.8rem;color:var(--muted);"></span>
+            <div style="display:flex;gap:0.5rem;">
+              <button class="btn btn-outline" style="padding:0.4rem 0.8rem;font-size:0.78rem;" id="mandi-prev" onclick="mandiPage(-1)">← Prev</button>
+              <button class="btn btn-outline" style="padding:0.4rem 0.8rem;font-size:0.78rem;" id="mandi-next" onclick="mandiPage(1)">Next →</button>
+            </div>
+          </div>
+
+          <!-- DATA SOURCE FOOTER -->
+          <div id="mandi-footer" style="display:none;margin-top:1.2rem;padding-top:1rem;border-top:1px solid rgba(21,128,61,0.15);display:flex;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;">
+            <span style="font-size:0.72rem;color:var(--muted);">
+              📡 Source: data.gov.in · Ministry of Agriculture / AGMARKNET
+            </span>
+            <span id="mandi-last-updated" style="font-size:0.72rem;color:var(--muted);"></span>
+          </div>
+        </div>
+
+        <!-- ── PRICE COMPARISON CARD ── -->
+        <div class="card" id="mandi-comparison-card" style="display:none;">
+          <div class="card-header">
+            <span class="card-title">📊 Market Comparison</span>
+            <span class="badge badge-green" id="mandi-cmp-commodity">—</span>
+          </div>
+          <p style="font-size:0.82rem;color:var(--muted);margin-bottom:1rem;">
+            Markets sorted by <strong>modal price</strong> (highest first) for the selected commodity.
+            All prices shown are from the <strong>same date</strong>.
+            These are reported wholesale prices, not guaranteed purchase prices.
+          </p>
+          <div id="mandi-comparison-body"></div>
+          <p style="font-size:0.72rem;color:var(--muted);margin-top:1rem;font-style:italic;">
+            ⚠️ Higher modal price does not guarantee higher profit — transportation costs, commission, and local conditions affect final returns.
+            Displayed prices are reported market prices and should not be confused with MSP or guaranteed procurement prices.
+          </p>
+        </div>
+      </div>
+
       <!-- ══════════ LISTINGS / BIDS PANELS ══════════ -->
       <div id="panel-listings" class="panel">
         <div class="card">
@@ -1650,6 +1758,7 @@
           "market",
           "climate",
           "ecosystem",
+          "mandi",
         ];
         const idx = tabs.indexOf(id);
         document.querySelectorAll(".ptab")[idx]?.classList.add("active");
@@ -2298,6 +2407,212 @@
           showToast("ℹ️ No key — smart fallback mode active", "ℹ️");
         }
       }
+
+      // ════════════════════════════════
+      // MANDI PRICES — Live from data.gov.in / AGMARKNET
+      // ════════════════════════════════
+      let mandiCurrentOffset = 0;
+      const MANDI_PAGE_SIZE = 50;
+      let mandiLastResult = null;
+
+      async function loadMandiPrices(offset) {
+        if (typeof offset === 'number') mandiCurrentOffset = offset;
+        else mandiCurrentOffset = 0;
+
+        const state = document.getElementById('mandi-state').value;
+        const district = document.getElementById('mandi-district').value.trim();
+        const commodity = document.getElementById('mandi-commodity').value.trim();
+
+        // Show loading, hide others
+        document.getElementById('mandi-status').style.display = 'block';
+        document.getElementById('mandi-error').style.display = 'none';
+        document.getElementById('mandi-table').style.display = 'none';
+        document.getElementById('mandi-pagination').style.display = 'none';
+        document.getElementById('mandi-footer').style.display = 'none';
+        document.getElementById('mandi-comparison-card').style.display = 'none';
+
+        const params = { limit: MANDI_PAGE_SIZE, offset: mandiCurrentOffset };
+        if (state) params.state = state;
+        if (district) params.district = district;
+        if (commodity) params.commodity = commodity;
+
+        try {
+          const data = await NexoraAPI.getMandiPrices(params);
+          document.getElementById('mandi-status').style.display = 'none';
+
+          if (!data.success) {
+            document.getElementById('mandi-error').style.display = 'block';
+            document.getElementById('mandi-error-msg').textContent = data.error || 'Could not load mandi prices.';
+            return;
+          }
+
+          mandiLastResult = data;
+
+          if (!data.records || data.records.length === 0) {
+            document.getElementById('mandi-error').style.display = 'block';
+            document.getElementById('mandi-error-msg').textContent = 'No mandi price data found for the selected filters. Try broadening your search.';
+            document.getElementById('mandi-error-msg').style.color = 'var(--muted)';
+            return;
+          }
+
+          renderMandiTable(data);
+          renderMandiComparison(data.records, commodity);
+
+        } catch (err) {
+          document.getElementById('mandi-status').style.display = 'none';
+          document.getElementById('mandi-error').style.display = 'block';
+          document.getElementById('mandi-error-msg').textContent = 'Network error: ' + (err.message || 'Could not reach server.');
+          document.getElementById('mandi-error-msg').style.color = 'var(--red)';
+        }
+      }
+
+      function renderMandiTable(data) {
+        const tbody = document.getElementById('mandi-tbody');
+        tbody.innerHTML = data.records.map(r => `
+          <tr>
+            <td style="font-weight:600;">${r.commodity}</td>
+            <td style="font-size:0.82rem;color:var(--muted);">${r.variety || '—'}</td>
+            <td style="font-size:0.82rem;">${r.state}</td>
+            <td style="font-size:0.82rem;">${r.market}</td>
+            <td style="text-align:right;">₹${r.minPrice != null ? Number(r.minPrice).toLocaleString('en-IN') : '—'}</td>
+            <td style="text-align:right;">₹${r.maxPrice != null ? Number(r.maxPrice).toLocaleString('en-IN') : '—'}</td>
+            <td style="text-align:right;font-weight:700;color:var(--leaf);">₹${r.modalPrice != null ? Number(r.modalPrice).toLocaleString('en-IN') : '—'}</td>
+            <td style="font-size:0.82rem;color:var(--muted);white-space:nowrap;">${r.arrivalDate || '—'}</td>
+          </tr>
+        `).join('');
+
+        document.getElementById('mandi-table').style.display = 'table';
+
+        // Pagination
+        const total = data.total || 0;
+        const showing = data.records.length;
+        const from = mandiCurrentOffset + 1;
+        const to = mandiCurrentOffset + showing;
+        document.getElementById('mandi-result-count').textContent = `Showing ${from}–${to} of ${total.toLocaleString('en-IN')} records`;
+        document.getElementById('mandi-prev').disabled = mandiCurrentOffset <= 0;
+        document.getElementById('mandi-next').disabled = (mandiCurrentOffset + MANDI_PAGE_SIZE) >= total;
+        document.getElementById('mandi-pagination').style.display = 'flex';
+
+        // Footer
+        document.getElementById('mandi-footer').style.display = 'flex';
+        document.getElementById('mandi-last-updated').textContent = '🕐 Fetched: ' + new Date(data.lastFetched || Date.now()).toLocaleString('en-IN');
+        if (data.fromCache) {
+          document.getElementById('mandi-data-badge').textContent = 'Daily — Cached';
+        } else {
+          document.getElementById('mandi-data-badge').textContent = 'Daily — AGMARKNET';
+        }
+      }
+
+      function mandiPage(dir) {
+        const newOffset = mandiCurrentOffset + (dir * MANDI_PAGE_SIZE);
+        if (newOffset < 0) return;
+        loadMandiPrices(newOffset);
+      }
+
+      function renderMandiComparison(records, queriedCommodity) {
+        // Group by commodity, pick the most frequent one if no specific commodity was queried
+        const commodityMap = {};
+        records.forEach(r => {
+          if (!r.commodity) return;
+          if (!commodityMap[r.commodity]) commodityMap[r.commodity] = [];
+          commodityMap[r.commodity].push(r);
+        });
+
+        let targetCommodity = queriedCommodity;
+        if (!targetCommodity) {
+          // Find commodity with most records
+          let maxCount = 0;
+          for (const [c, arr] of Object.entries(commodityMap)) {
+            if (arr.length > maxCount) { maxCount = arr.length; targetCommodity = c; }
+          }
+        }
+
+        const subset = commodityMap[targetCommodity];
+        if (!subset || subset.length < 2) {
+          document.getElementById('mandi-comparison-card').style.display = 'none';
+          return;
+        }
+
+        // Group by date — only compare same-date records
+        const dateGroups = {};
+        subset.forEach(r => {
+          const d = r.arrivalDate || 'Unknown';
+          if (!dateGroups[d]) dateGroups[d] = [];
+          dateGroups[d].push(r);
+        });
+
+        // Pick the date with the most records
+        let bestDate = null, bestCount = 0;
+        for (const [d, arr] of Object.entries(dateGroups)) {
+          if (arr.length > bestCount) { bestCount = arr.length; bestDate = d; }
+        }
+
+        const comparable = (dateGroups[bestDate] || []).sort((a, b) => (b.modalPrice || 0) - (a.modalPrice || 0));
+        if (comparable.length < 2) {
+          document.getElementById('mandi-comparison-card').style.display = 'none';
+          return;
+        }
+
+        document.getElementById('mandi-cmp-commodity').textContent = targetCommodity;
+        const topModal = comparable[0].modalPrice || 0;
+
+        document.getElementById('mandi-comparison-body').innerHTML = comparable.map((r, i) => {
+          const diff = r.modalPrice - topModal;
+          const pct = topModal > 0 ? ((r.modalPrice / topModal) * 100).toFixed(1) : '—';
+          const barWidth = topModal > 0 ? Math.max(5, (r.modalPrice / topModal) * 100) : 0;
+          const isTop = i === 0;
+          return `
+            <div style="display:flex;align-items:center;gap:1rem;padding:0.6rem 0;border-bottom:1px solid rgba(21,128,61,0.08);">
+              <div style="min-width:28px;text-align:center;font-weight:700;font-size:0.9rem;color:${isTop ? 'var(--lime)' : 'var(--muted)'};">
+                ${isTop ? '🥇' : '#' + (i + 1)}
+              </div>
+              <div style="flex:1;min-width:0;">
+                <div style="font-size:0.88rem;font-weight:600;">${r.market}</div>
+                <div style="font-size:0.75rem;color:var(--muted);">${r.district}, ${r.state}${r.variety ? ' · ' + r.variety : ''}</div>
+                <div style="height:6px;border-radius:3px;background:rgba(21,128,61,0.1);margin-top:0.3rem;overflow:hidden;">
+                  <div style="height:100%;width:${barWidth}%;background:${isTop ? 'linear-gradient(90deg,var(--leaf),var(--lime))' : 'linear-gradient(90deg,var(--gold),#FBBF24)'};border-radius:3px;transition:width 0.4s;"></div>
+                </div>
+              </div>
+              <div style="text-align:right;min-width:100px;">
+                <div style="font-weight:700;font-size:0.95rem;color:${isTop ? 'var(--leaf)' : 'var(--cream)'};">₹${Number(r.modalPrice).toLocaleString('en-IN')}</div>
+                <div style="font-size:0.72rem;color:${diff === 0 ? 'var(--lime)' : 'var(--red)'};">
+                  ${diff === 0 ? '★ Highest' : diff.toLocaleString('en-IN')}
+                </div>
+              </div>
+            </div>
+          `;
+        }).join('');
+
+        document.getElementById('mandi-comparison-card').style.display = 'block';
+      }
+
+      // Populate state dropdown on first panel visit
+      let mandiFiltersLoaded = false;
+      async function loadMandiFilters() {
+        if (mandiFiltersLoaded) return;
+        try {
+          const data = await NexoraAPI.getMandiFilters();
+          if (data.success && data.states && data.states.length) {
+            const sel = document.getElementById('mandi-state');
+            const current = sel.value;
+            sel.innerHTML = '<option value="">All States</option>' +
+              data.states.map(s => `<option value="${s}" ${s === current ? 'selected' : ''}>${s}</option>`).join('');
+            mandiFiltersLoaded = true;
+          }
+        } catch (e) {
+          console.warn('Could not load mandi filters:', e.message);
+        }
+      }
+
+      // Override showPanel to auto-load mandi data on first visit
+      const _origShowPanel = showPanel;
+      showPanel = function(id) {
+        _origShowPanel(id);
+        if (id === 'mandi') {
+          loadMandiFilters();
+          if (!mandiLastResult) loadMandiPrices();
+        }
+      };
 
       // ── TOAST ──
       function showToast(msg, icon = "✅") {

@@ -16,6 +16,7 @@ const chatRoutes = require('./routes/chat');
 const matchingRoutes = require('./routes/matching');
 const priceRoutes = require('./routes/price'); // ← added: AI Price Estimate
 const advisorRoutes = require('./routes/advisor'); // ← NEW: AI Crop Advisor + chatbot
+const mandiPriceRoutes = require('./routes/mandiPrices'); // ← NEW: Live Mandi Prices (data.gov.in / AGMARKNET)
 
 // ← added: logistics routes (auth now goes through the shared /api/auth routes above —
 // logistics partners are just `role: 'logistics'` Users, so there's no separate
@@ -46,6 +47,7 @@ app.use('/api/chat', chatRoutes);
 app.use('/api/matching', matchingRoutes);
 app.use('/api/price', priceRoutes); // ← added: AI Price Estimate
 app.use('/api/advisor', advisorRoutes); // ← NEW: AI Crop Advisor + chatbot
+app.use('/api/mandi-prices', mandiPriceRoutes); // ← NEW: Live Mandi Prices
 
 // ← added: logistics routes
 app.use('/api/logistics/transactions', logisticsTransactionRoutes);

@@ -75,6 +75,15 @@ const NexoraAPI = {
   // ══════════ AI SMART MATCHING ══════════
   smartMatchBuyerToFarmer(payload) { return apiRequest('/api/matching/buyer-to-farmer', { method: 'POST', body: payload, auth: false }); },
   smartMatchFarmerToBuyer(payload) { return apiRequest('/api/matching/farmer-to-buyer', { method: 'POST', body: payload, auth: false }); },
+
+  // ══════════ MANDI PRICES (data.gov.in / AGMARKNET) ══════════
+  getMandiPrices(params = {}) {
+    const qs = new URLSearchParams(params).toString();
+    return apiRequest(`/api/mandi-prices${qs ? '?' + qs : ''}`, { auth: false });
+  },
+  getMandiFilters() {
+    return apiRequest('/api/mandi-prices/filters', { auth: false });
+  },
 };
 
 // ══════════ REAL-TIME CHAT SOCKET ══════════
