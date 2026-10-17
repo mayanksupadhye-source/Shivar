@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
-gir<head>
+<head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
 <title>Shivar — Choose Your Language / भाषा निवडा</title>
@@ -226,7 +226,19 @@ gir<head>
     text-underline-offset: 3px;
   }
   .link-plain:hover, .link-plain:focus-visible { color: var(--leaf-deep); }
-
+  .educate-wrap { margin-top: 2.2rem; animation: gwFadeUp 0.7s 0.5s cubic-bezier(.16,1,.3,1) both; }
+  .btn-educate {
+    display: inline-flex; align-items: center; gap: 0.5rem;
+    background: rgba(255,255,255,0.85); color: var(--leaf-deep);
+    border: 1.5px solid rgba(21,128,61,0.45); border-radius: 100px;
+    padding: 0.85rem 1.8rem; font-weight: 600; font-size: 1rem; text-decoration: none;
+    box-shadow: 0 8px 24px rgba(30,58,138,0.08);
+    transition: transform 0.2s, box-shadow 0.2s, background 0.2s, border-color 0.2s;
+  }
+  .btn-educate:hover, .btn-educate:focus-visible {
+    transform: translateY(-2px) scale(1.03); background: #fff; border-color: var(--leaf);
+    box-shadow: 0 14px 34px rgba(37,99,235,0.25); outline: none;
+  }
   /* ── ANIMATIONS ── */
   @keyframes gwFadeUp { from { opacity: 0; transform: translateY(22px); } to { opacity: 1; transform: translateY(0); } }
   @keyframes gwLogoPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.06); } }
@@ -335,6 +347,9 @@ gir<head>
         <span class="lang-native">ਪੰਜਾਬੀ</span>
         <span class="lang-cta">ਪੰਜਾਬੀ ਵਿੱਚ ਅੱਗੇ ਵਧੋ <span class="lang-arrow" aria-hidden="true">→</span></span>
       </button>
+    </div>
+    <div class="educate-wrap">
+      <a href="info.html" class="btn-educate">📚 Get Educated</a>
     </div>
   </section>
 
