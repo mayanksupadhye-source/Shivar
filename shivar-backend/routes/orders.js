@@ -1,5 +1,6 @@
 const express = require('express');
 const Order = require('../models/Order');
+const Transaction = require('../models/Transaction');
 const Feedback = require('../models/Feedback');
 const User = require('../models/User');
 const H = require('../config/honour');
@@ -7,16 +8,64 @@ const { requireAuth, requireRole } = require('../middleware/auth');
 
 const router = express.Router();
 
-// ── GET my orders (works for both farmer and buyer — filters by their own ID) ──
+// ── GET my orders (works for both farmer and buyer — bridges Transaction & Order collections) ──
 router.get('/my', requireAuth, async (req, res) => {
   try {
     const filter = req.user.role === 'farmer' ? { farmer: req.user.id } : { buyer: req.user.id };
-    const orders = await Order.find(filter)
-      .populate('listing')
-      .populate('buyer', 'name district mobile')
-      .populate('farmer', 'name district mobile')
-      .sort({ createdAt: -1 });
-    res.json(orders);
+    const [transactions, orders, feedbacks] = await Promise.all([
+      Transaction.find(filter)
+        .populate('listing')
+        .populate('buyer', 'name district mobile companyName marketplaceId')
+        .populate('farmer', 'name district mobile marketplaceId honourScore isBlacklisted')
+        .populate('logisticsPartner', 'name mobile marketplaceId')
+        .sort({ createdAt: -1 }),
+      Order.find(filter)
+        .populate('listing')
+        .populate('buyer', 'name district mobile')
+        .populate('farmer', 'name district mobile honourScore isBlacklisted')
+        .sort({ createdAt: -1 }),
+      Feedback.find(req.user.role === 'farmer' ? { farmer: req.user.id } : { buyer: req.user.id }).lean(),
+    ]);
+
+    const feedbackOrderIds = new Set(feedbacks.map((f) => String(f.order)));
+    const mergedMap = new Map();
+
+    // Transactions are the source of truth for logistics, shipment code, and pricing
+    for (const t of transactions) {
+      const idStr = String(t._id);
+      mergedMap.set(idStr, {
+        ...t.toObject(),
+        _id: t._id,
+        id: t._id,
+        finalPrice: t.agreed_price_per_quintal,
+        quantity: t.quantity_tons,
+        feedbackGiven: t.feedbackGiven || feedbackOrderIds.has(idStr),
+        receivedAt: t.receivedAt || null,
+        shipment_code: t.shipment_code,
+        sacks_count: t.sacks_count,
+        status: t.status,
+      });
+    }
+
+    // Add any standalone orders not already in map
+    for (const o of orders) {
+      const idStr = String(o._id);
+      if (!mergedMap.has(idStr)) {
+        mergedMap.set(idStr, {
+          ...o.toObject(),
+          _id: o._id,
+          id: o._id,
+          feedbackGiven: o.feedbackGiven || feedbackOrderIds.has(idStr),
+          receivedAt: o.receivedAt,
+        });
+      }
+    }
+
+    const result = Array.from(mergedMap.values()).sort(
+      (a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)
+    );
+
+    res.json(result);
   } catch (err) {
     res.status(500).json({ error: 'Could not fetch orders', detail: err.message });
   }
@@ -54,19 +103,29 @@ router.put('/:id/status', requireAuth, async (req, res) => {
     }
 
     const order = await Order.findById(req.params.id);
-    if (!order) return res.status(404).json({ error: 'Order not found' });
+    const tx = await Transaction.findById(req.params.id);
 
-    const isParty = String(order.farmer) === req.user.id || String(order.buyer) === req.user.id;
+    if (!order && !tx) return res.status(404).json({ error: 'Order not found' });
+
+    const farmerId = order?.farmer || tx?.farmer;
+    const buyerId = order?.buyer || tx?.buyer;
+    const isParty = String(farmerId) === req.user.id || String(buyerId) === req.user.id;
     if (!isParty) return res.status(403).json({ error: 'Not your order' });
 
-    // a finished order cannot be changed again
-    if (order.status === 'completed') {
+    if (order && order.status === 'completed') {
       return res.status(400).json({ error: 'This order is already completed' });
     }
 
-    order.status = status;
-    await order.save();
-    res.json(order);
+    if (order) {
+      order.status = status;
+      await order.save();
+    }
+    if (tx) {
+      tx.status = status;
+      await tx.save();
+    }
+
+    res.json(order || tx);
   } catch (err) {
     res.status(500).json({ error: 'Could not update order', detail: err.message });
   }
@@ -76,10 +135,20 @@ router.put('/:id/status', requireAuth, async (req, res) => {
 router.put('/:id/received', requireAuth, requireRole('buyer'), async (req, res) => {
   try {
     const order = await Order.findById(req.params.id);
-    if (!order) return res.status(404).json({ error: 'Order not found' });
-    if (String(order.buyer) !== req.user.id) return res.status(403).json({ error: 'Not your order' });
-    if (order.feedbackGiven) return res.status(400).json({ error: 'Feedback already given for this order' });
-    if (!H.RECEIVABLE_STATUSES.includes(order.status)) {
+    const tx = await Transaction.findById(req.params.id);
+
+    if (!order && !tx) return res.status(404).json({ error: 'Order not found' });
+
+    const buyerId = order?.buyer || tx?.buyer;
+    const farmerId = order?.farmer || tx?.farmer;
+    const currentStatus = order?.status || tx?.status;
+    const alreadyGiven = (order && order.feedbackGiven) || (tx && tx.feedbackGiven);
+
+    if (String(buyerId) !== req.user.id) return res.status(403).json({ error: 'Not your order' });
+    if (alreadyGiven) return res.status(400).json({ error: 'Feedback already given for this order' });
+
+    const receivableStatuses = ['confirmed', 'shipped', 'logistics_confirmed', 'assigned', 'in_transit', 'delivered'];
+    if (!receivableStatuses.includes(currentStatus)) {
       return res.status(400).json({ error: 'This order cannot be marked received right now' });
     }
 
@@ -91,30 +160,45 @@ router.put('/:id/received', requireAuth, requireRole('buyer'), async (req, res) 
     }
     const average = Math.round(((quality + packaging + honesty) / 3) * 100) / 100;
 
+    const targetId = order?._id || tx?._id;
+
     // Unique index on Feedback.order blocks double submissions
     let feedbackDoc;
     try {
       feedbackDoc = await Feedback.create({
-        order: order._id, farmer: order.farmer, buyer: order.buyer, quality, packaging, honesty, average,
+        order: targetId,
+        farmer: farmerId,
+        buyer: buyerId,
+        quality,
+        packaging,
+        honesty,
+        average,
       });
     } catch (e) {
       if (e.code === 11000) return res.status(409).json({ error: 'Feedback already given for this order' });
       throw e;
     }
 
-    // if saving the order fails, remove the feedback so the buyer can try again
     try {
-      order.status = 'completed';
-      order.feedbackGiven = true;
-      order.receivedAt = new Date();
-      await order.save();
+      if (order) {
+        order.status = 'completed';
+        order.feedbackGiven = true;
+        order.receivedAt = new Date();
+        await order.save();
+      }
+      if (tx) {
+        tx.status = 'delivered';
+        tx.feedbackGiven = true;
+        tx.receivedAt = new Date();
+        await tx.save();
+      }
     } catch (saveErr) {
       await Feedback.deleteOne({ _id: feedbackDoc._id });
       throw saveErr;
     }
 
     // Update the farmer's honour score: good ratings add points, poor ratings remove points
-    const farmer = await User.findById(order.farmer).select('honourScore reviewedOrders isBlacklisted');
+    const farmer = await User.findById(farmerId).select('honourScore reviewedOrders isBlacklisted');
     let honourScore = null;
     let honourChange = 0;
     if (farmer) {
@@ -127,11 +211,16 @@ router.put('/:id/received', requireAuth, requireRole('buyer'), async (req, res) 
         set.isBlacklisted = true;
         set.blacklistedAt = new Date();
       }
-      await User.findByIdAndUpdate(order.farmer, { $set: set });
+      await User.findByIdAndUpdate(farmerId, { $set: set });
       honourScore = newScore;
     }
 
-    res.json({ message: 'Order received, thank you for your feedback', order, honourScore, honourChange });
+    res.json({
+      message: 'Order received, thank you for your feedback',
+      order: order || tx,
+      honourScore,
+      honourChange,
+    });
   } catch (err) {
     res.status(500).json({ error: 'Could not save feedback', detail: err.message });
   }

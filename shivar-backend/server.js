@@ -5,68 +5,74 @@ const cors = require('cors');
 const { Server } = require('socket.io');
 
 const connectDB = require('./config/db');
-const initChatSocket = require('./sockets/chatSocket');
-const initLogisticsChatSocket = require('./sockets/logisticsChatSocket'); // ← added
+const initUnifiedSocket = require('./sockets/chatSocket');
 
 const authRoutes = require('./routes/auth');
 const listingRoutes = require('./routes/listings');
+const demandRoutes = require('./routes/demand');
 const bidRoutes = require('./routes/bids');
 const orderRoutes = require('./routes/orders');
+const transactionRoutes = require('./routes/transactions');
 const chatRoutes = require('./routes/chat');
 const matchingRoutes = require('./routes/matching');
-const priceRoutes = require('./routes/price'); // ← added: AI Price Estimate
-const advisorRoutes = require('./routes/advisor'); // ← NEW: AI Crop Advisor + chatbot
-const mandiPriceRoutes = require('./routes/mandiPrices'); // ← NEW: Live Mandi Prices (data.gov.in / AGMARKNET)
+const priceRoutes = require('./routes/price');
+const advisorRoutes = require('./routes/advisor');
+const mandiPriceRoutes = require('./routes/mandiPrices');
+const qualityRoutes = require('./routes/quality.routes');
 
-// ← added: logistics routes (auth now goes through the shared /api/auth routes above —
-// logistics partners are just `role: 'logistics'` Users, so there's no separate
-// logistics auth route anymore)
 const logisticsTransactionRoutes = require('./routes/logisticsTransactions');
 const logisticsMessageRoutes = require('./routes/logisticsMessages');
 
 const app = express();
 const server = http.createServer(app);
 
-// ── CORS: allow your frontend to call this API ──
+// ── CORS: allow frontend clients ──
 app.use(cors({ origin: process.env.CLIENT_URL || '*' }));
 app.use(express.json());
 
-// ── Socket.io, same CORS rule ──
+// ── Unified Socket.io Gateway ──
 const io = new Server(server, {
   cors: { origin: process.env.CLIENT_URL || '*' },
 });
-initChatSocket(io);
-initLogisticsChatSocket(io); // ← added
+initUnifiedSocket(io);
+app.set('io', io);
 
 // ── Routes ──
 app.use('/api/auth', authRoutes);
 app.use('/api/listings', listingRoutes);
+app.use('/api/demand', demandRoutes);
 app.use('/api/bids', bidRoutes);
 app.use('/api/orders', orderRoutes);
+app.use('/api/transactions', transactionRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/matching', matchingRoutes);
-app.use('/api/price', priceRoutes); // ← added: AI Price Estimate
-app.use('/api/advisor', advisorRoutes); // ← NEW: AI Crop Advisor + chatbot
-app.use('/api/mandi-prices', mandiPriceRoutes); // ← NEW: Live Mandi Prices
+app.use('/api/price', priceRoutes);
+app.use('/api/advisor', advisorRoutes);
+app.use('/api/mandi-prices', mandiPriceRoutes);
+app.use('/api/quality', qualityRoutes);
 
-// ← added: logistics routes
+// Logistics portal endpoints
 app.use('/api/logistics/transactions', logisticsTransactionRoutes);
 app.use('/api/logistics/messages', logisticsMessageRoutes);
 
 app.get('/', (req, res) => {
-  res.json({ status: 'Nexora API is running' });
+  res.json({ status: 'SHIVAR API is running', version: '2.0-canonical' });
 });
 
-// ── Basic error handler for anything that slips through ──
+// ── Basic error handler ──
 app.use((err, req, res, next) => {
   console.error(err);
-  res.status(500).json({ error: 'Something went wrong' });
+  res.status(500).json({ error: 'Something went wrong', detail: err.message });
 });
 
 const PORT = process.env.PORT || 5000;
 
-connectDB().then(() => {
-  server.listen(PORT, () => {
-    console.log(`🚀 Nexora backend running on port ${PORT}`);
+if (require.main === module) {
+  connectDB().then(() => {
+    server.listen(PORT, () => {
+      console.log(`🚀 SHIVAR backend running on port ${PORT}`);
+    });
   });
-});
+}
+
+module.exports = { app, server };

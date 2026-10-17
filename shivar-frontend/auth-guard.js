@@ -39,16 +39,11 @@ const AuthGuard = {
 
   // JWTs use base64URL encoding (- and _ instead of + and /), which plain atob() can't read
   getTokenPayload() {
-  try {
-    return JSON.parse(this._base64UrlDecode(this.getToken().split('.')[1]));
-  } catch { return null; }
-},
-  getTokenPayload() {
-  try {
-    return JSON.parse(this._base64UrlDecode(this.getToken().split('.')[1]));
-  } catch { return null; }
-},
-_base64UrlDecode(str) {
+    try {
+      return JSON.parse(this._base64UrlDecode(this.getToken().split('.')[1]));
+    } catch { return null; }
+  },
+  _base64UrlDecode(str) {
     let base64 = str.replace(/-/g, '+').replace(/_/g, '/');
     while (base64.length % 4) base64 += '=';
     return decodeURIComponent(atob(base64).split('').map(c =>

@@ -1166,7 +1166,8 @@
           grid.innerHTML =
             '<p style="color:var(--muted);padding:1rem;">Could not reach the matching service — make sure the backend and ML service are running.</p>';
           console.error("Smart matching error:", err);
-        )
+        }
+      }
 
       function showToast(msg) {
         const t = document.getElementById("toast");

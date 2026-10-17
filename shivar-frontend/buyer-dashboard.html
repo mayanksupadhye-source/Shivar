@@ -2,7 +2,8 @@
 <html lang="en">
   <head>
     <script src="auth-guard.js"></script>
-    <script src="http://localhost:5000/socket.io/socket.io.js"></script>
+    <script src="socket.io.min.js"></script>
+    <script>if (typeof io === 'undefined') { document.write('<script src="http://localhost:5000/socket.io/socket.io.js"><\/script>'); }</script>
     <script src="api-client.js"></script>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -1689,6 +1690,10 @@
     </div>
 
     <script>
+      function escapeHtml(s) {
+        return String(s || '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+      }
+
       // ── AUTH GUARD ── real check: redirects to login if not a verified buyer
       if (!AuthGuard.require("buyer")) {
         throw new Error("Not authenticated");
@@ -1874,8 +1879,9 @@
           status: statusMap[b.status] || "Pending",
           listingId: b.listing?._id,
           farmerId: b.farmer?._id,
-                    honour: b.farmer?.honourScore,
+          honour: b.farmer?.honourScore,
           blacklisted: !!b.farmer?.isBlacklisted,
+          shipment_code: b.transaction?.shipment_code || null,
         };
       }
 
@@ -1937,7 +1943,7 @@
       <td>
         ${b.status === "Pending" ? `<button class="small-btn small-btn-outline" style="font-size:0.72rem" onclick="cancelBid('${b.id}')">Cancel</button>` : ""}
         ${b.status === "Counter Offer" ? `<button class="small-btn small-btn-green" style="font-size:0.72rem" onclick="acceptCounter('${b.id}')">Accept</button>` : ""}
-        ${b.status === "Accepted" ? `<span style="font-size:0.72rem;color:var(--lime)">✅ Order created</span>` : ""}
+        ${b.status === "Accepted" ? `<span style="font-size:0.72rem;color:var(--lime)">✅ Order created</span>${b.shipment_code ? `<br><span style="font-family:monospace; background:rgba(5,150,105,0.1); color:#059669; padding:2px 6px; border-radius:4px; font-weight:600; font-size:0.72rem;">📦 ${escapeHtml(b.shipment_code)}</span>` : ""}` : ""}
       </td>
     </tr>`,
           )
@@ -2087,25 +2093,33 @@
         },
       ];
 
-      // Backend order.status is one of confirmed/shipped/completed/cancelled — map to this UI's labels
+      // Backend order.status is one of confirmed/shipped/completed/cancelled/logistics_confirmed — map to this UI's labels
       function mapBackendOrder(o) {
         const statusMap = {
           confirmed: "Confirmed",
+          logistics_confirmed: "Logistics Confirmed",
+          assigned: "Logistics Assigned",
+          in_transit: "In Transit",
           shipped: "In Transit",
-          completed: "Delivered",
+          delivered: "Delivered",
+          completed: "Completed",
           cancelled: "Cancelled",
         };
+        const cropTitle = o.crop || o.listing?.crop || "Crop";
+        const qtyVal = o.quantity_tons || o.quantity || 0;
+        const priceVal = o.agreed_price_per_quintal || o.finalPrice || 0;
         return {
           id: o._id,
           isReal: true,
-          crop: `${o.listing?.crop || "Crop"} · ${o.quantity} qtl`,
+          crop: `${cropTitle} · ${qtyVal} tons/qtl`,
           farmer: o.farmer?.name || "Farmer",
-          location: o.farmer?.district || "",
+          location: o.pickup_location || o.farmer?.district || "",
           amount:
-            "₹" + Number(o.finalPrice * o.quantity).toLocaleString("en-IN"),
-          date: new Date(o.createdAt).toLocaleDateString("en-IN"),
+            "₹" + Number(priceVal * (qtyVal || 1)).toLocaleString("en-IN"),
+          date: new Date(o.createdAt || o.transaction_date || Date.now()).toLocaleDateString("en-IN"),
           status: statusMap[o.status] || "Confirmed",
-                    rawStatus: o.status,
+          rawStatus: o.status,
+          shipment_code: o.shipment_code || null,
           feedbackGiven: !!o.feedbackGiven,
         };
       }
@@ -2135,12 +2149,18 @@
         const statusClass = {
           "In Transit": "os-transit",
           Delivered: "os-delivered",
+          Completed: "os-delivered",
+          "Logistics Confirmed": "os-transit",
+          "Logistics Assigned": "os-transit",
           Confirmed: "os-pending",
           Cancelled: "os-declined",
         };
         const statusIcon = {
           "In Transit": "🚛",
           Delivered: "✅",
+          Completed: "✅",
+          "Logistics Confirmed": "🚛",
+          "Logistics Assigned": "🚛",
           Confirmed: "📋",
           Cancelled: "❌",
         };
@@ -2149,13 +2169,14 @@
             (o) => `
     <div class="order-item">
       <div class="order-info">
-        <h5>${o.crop}</h5>
-        <p>👨‍🌾 ${o.farmer} · 📍 ${o.location || ""} · ${o.date}</p>
+        <h5>${escapeHtml(o.crop)}</h5>
+        <p>👨‍🌾 ${escapeHtml(o.farmer)} · 📍 ${escapeHtml(o.location || "")} · ${o.date}</p>
+        ${o.shipment_code ? `<p style="margin-top:0.3rem;"><span style="font-family:monospace; background:rgba(5,150,105,0.1); color:#059669; padding:2px 8px; border-radius:4px; font-weight:600; font-size:0.75rem;">📦 Shipment Code: ${escapeHtml(o.shipment_code)}</span></p>` : ""}
       </div>
       <div class="order-right">
         <div class="order-amount">${o.amount}</div>
         <span class="order-status ${statusClass[o.status] || "os-pending"}">${statusIcon[o.status] || "📋"} ${o.status}</span>
-                ${o.isReal && !o.feedbackGiven && ["confirmed", "shipped"].includes(o.rawStatus) ? `<div style="margin-top:0.5rem"><button class="small-btn small-btn-green" onclick="openFeedback('${o.id}')">📦 Order Received</button></div>` : ""}
+        ${o.isReal && !o.feedbackGiven && ["confirmed", "shipped", "logistics_confirmed", "assigned", "in_transit", "delivered"].includes(o.rawStatus) ? `<div style="margin-top:0.5rem"><button class="small-btn small-btn-green" onclick="openFeedback('${o.id}')">📦 Order Received</button></div>` : ""}
         ${o.isReal && o.feedbackGiven ? `<div style="margin-top:0.5rem;font-size:0.75rem;color:var(--gold)">⭐ Feedback given</div>` : ""}
       </div>
     </div>`,
