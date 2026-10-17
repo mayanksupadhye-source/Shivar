@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Shivar — Get Educated</title>
+<link rel="icon" href="images/shivar-logo.png" type="image/png" />
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
+<style>
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --sky: #F0F9FF; --meadow: #F0FDF4; --field: #DCFCE7;
+    --leaf: #15803D; --leaf-deep: #14532D; --blue: #2563EB; --blue-deep: #1E3A8A;
+    --text-main: #17352A; --text-muted: #526B61; --line: rgba(20,83,45,0.16);
+  }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: 'DM Sans', sans-serif; color: var(--text-main);
+    background: linear-gradient(180deg, var(--meadow) 0%, var(--sky) 45%, var(--meadow) 100%);
+  }
+  nav {
+    position: sticky; top: 0; z-index: 10; display: flex; align-items: center;
+    justify-content: space-between; padding: 1rem 2rem;
+    background: rgba(255,255,255,0.8); backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--line);
+  }
+  .logo { font-family: 'Playfair Display', serif; font-weight: 900; font-size: 1.5rem; color: var(--leaf-deep); text-decoration: none; }
+  .logo span { color: var(--blue-deep); }
+  .nav-links { display: flex; gap: 1.2rem; align-items: center; }
+  .nav-links a { color: var(--text-muted); text-decoration: none; font-weight: 500; font-size: 0.9rem; }
+  .nav-links a:hover { color: var(--leaf-deep); }
+  .btn {
+    display: inline-block; text-decoration: none; font-weight: 600; font-size: 0.95rem;
+    padding: 0.8rem 1.7rem; border-radius: 8px; transition: transform 0.2s, box-shadow 0.2s;
+  }
+  .btn:hover { transform: translateY(-2px) scale(1.03); }
+  .btn-primary { color: #fff; background: linear-gradient(135deg, var(--leaf), var(--blue)); box-shadow: 0 8px 24px rgba(21,128,61,0.3); }
+  .btn-secondary { color: var(--leaf-deep); background: rgba(255,255,255,0.7); border: 1.5px solid rgba(21,128,61,0.4); }
+  .btn-logout { cursor: pointer; font-family: inherit; color: #b91c1c; background: rgba(255,255,255,0.7); border: 1.5px solid rgba(185,28,28,0.45); padding: 0.6rem 1.2rem; }
+  .btn-logout:hover { background: #fee2e2; }
+
+  header.hero { text-align: center; padding: 5rem 1.5rem 3rem; max-width: 800px; margin: 0 auto; }
+  .eyebrow { font-size: 0.78rem; letter-spacing: 2px; text-transform: uppercase; font-weight: 700; color: var(--leaf-deep); margin-bottom: 0.8rem; }
+  h1 { font-family: 'Playfair Display', serif; font-weight: 900; font-size: clamp(2.2rem, 5.5vw, 3.6rem); line-height: 1.12; color: var(--leaf-deep); margin-bottom: 1.1rem; }
+  .lead { font-size: 1.1rem; line-height: 1.7; color: var(--text-muted); }
+  .video-section { padding-top: 0; padding-bottom: 1rem; }
+.intro-video { width: 100%; max-width: 900px; display: block; margin: 0 auto; border-radius: 16px; background: #000; box-shadow: 0 18px 40px rgba(30,58,138,0.14); }
+
+  section { max-width: 1050px; margin: 0 auto; padding: 3rem 1.5rem; }
+  h2 { font-family: 'Playfair Display', serif; font-weight: 900; font-size: clamp(1.6rem, 3.5vw, 2.3rem); margin-bottom: 0.7rem; }
+  .section-sub { color: var(--text-muted); line-height: 1.7; max-width: 640px; margin-bottom: 2rem; }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1.2rem; }
+  .card {
+    background: rgba(255,255,255,0.85); border: 1px solid var(--line); border-radius: 16px;
+    padding: 1.5rem; box-shadow: 0 10px 28px rgba(30,58,138,0.06);
+    transition: transform 0.25s, box-shadow 0.25s, border-color 0.25s;
+  }
+  .card:hover { transform: translateY(-4px); border-color: rgba(21,128,61,0.5); box-shadow: 0 18px 40px rgba(30,58,138,0.14); }
+  .card .icon { font-size: 1.8rem; margin-bottom: 0.7rem; display: block; }
+  .card h3 { font-size: 1.05rem; margin-bottom: 0.4rem; }
+  .card p { font-size: 0.9rem; color: var(--text-muted); line-height: 1.6; }
+
+  .steps { counter-reset: step; display: grid; gap: 1rem; }
+  .step { display: flex; gap: 1rem; align-items: flex-start; background: rgba(255,255,255,0.85); border: 1px solid var(--line); border-radius: 14px; padding: 1.1rem 1.3rem; }
+  .step::before {
+    counter-increment: step; content: counter(step); flex-shrink: 0;
+    width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    color: #fff; font-weight: 700; background: linear-gradient(135deg, var(--leaf), var(--blue));
+  }
+  .step h3 { font-size: 1rem; margin-bottom: 0.2rem; }
+  .step p { font-size: 0.9rem; color: var(--text-muted); line-height: 1.55; }
+
+  details { background: rgba(255,255,255,0.85); border: 1px solid var(--line); border-radius: 12px; padding: 1rem 1.2rem; margin-bottom: 0.8rem; }
+  summary { cursor: pointer; font-weight: 600; }
+  details p { margin-top: 0.7rem; color: var(--text-muted); line-height: 1.65; font-size: 0.92rem; }
+
+  .cta {
+    text-align: center; margin: 2rem auto 0; padding: 3rem 1.5rem;
+    background: linear-gradient(135deg, var(--leaf-deep), var(--blue-deep)); color: #fff;
+  }
+  .cta h2 { color: #fff; }
+  .cta p { opacity: 0.85; margin-bottom: 1.6rem; }
+  .cta .btn-secondary { color: #fff; background: transparent; border-color: rgba(255,255,255,0.6); }
+  .cta-actions { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; }
+  .note { text-align: center; font-size: 0.8rem; color: var(--text-muted); padding: 1.5rem; }
+
+  @media (max-width: 640px) { nav { padding: 0.9rem 1rem; } .nav-links a.hide-sm { display: none; } header.hero { padding-top: 3rem; } }
+</style>
+</head>
+<body>
+
+<nav>
+  <a class="logo" href="index.html">Shiv<span>ar</span></a>
+  <div class="nav-links">
+    <a class="hide-sm" href="#how">How it works</a>
+    <a class="hide-sm" href="#features">Features</a>
+    <a class="hide-sm" href="#faq">FAQ</a>
+    <button type="button" class="btn btn-logout" id="logoutBtn">Log out</button>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="eyebrow">Get Educated</div>
+  <h1>Learn how Shivar connects your farm to the right market</h1>
+  <p class="lead">Shivar helps farmers understand the market, find buyers directly, and move their produce from farm to delivery, all in one place.</p>
+</header>
+<section class="video-section">
+  <video class="intro-video" autoplay muted playsinline controls preload="auto">
+    <source src="Code_Craft_1.mp4" type="video/mp4" />
+    Your browser does not support the video tag.
+  </video>
+</section>
+
+<section id="problem">
+  <h2>Why Shivar?</h2>
+  <p class="section-sub">A farmer can grow the right crop at the right time and still struggle to reach the right buyer. Shivar closes that gap.</p>
+  <div class="grid">
+    <div class="card"><span class="icon">💸</span><h3>Fewer middlemen</h3><p>Connect directly with industries and bulk buyers instead of depending on many intermediaries.</p></div>
+    <div class="card"><span class="icon">📉</span><h3>Price clarity</h3><p>See market trends and price signals so you know what your crop may be worth.</p></div>
+    <div class="card"><span class="icon">🌦️</span><h3>Better planning</h3><p>Combine weather, demand and market information to decide what and when to grow.</p></div>
+  </div>
+</section>
+
+<section id="how">
+  <h2>How it works</h2>
+  <p class="section-sub">From your field to the buyer, in simple steps.</p>
+  <div class="steps">
+    <div class="step"><div><h3>Choose your role and sign in</h3><p>Pick Farmer, Buyer or Logistics, then log in or register with email verification.</p></div></div>
+    <div class="step"><div><h3>List or discover crops</h3><p>Farmers list crop, quantity, price and location. Buyers browse what is available.</p></div></div>
+    <div class="step"><div><h3>Match, bid and negotiate</h3><p>Smart matching suggests suitable partners. Bid and chat directly to agree on a deal.</p></div></div>
+    <div class="step"><div><h3>Arrange delivery</h3><p>Logistics partners pick up the produce and deliver it to the buyer.</p></div></div>
+  </div>
+</section>
+
+<section id="features">
+  <h2>What you get</h2>
+  <p class="section-sub">Everything a farmer needs, in one platform.</p>
+  <div class="grid">
+    <div class="card"><span class="icon">🛒</span><h3>Marketplace</h3><p>Digital crop listings that buyers can discover.</p></div>
+    <div class="card"><span class="icon">📊</span><h3>Market intelligence</h3><p>Market trends, demand signals and price insights.</p></div>
+    <div class="card"><span class="icon">🤖</span><h3>AI crop advisory</h3><p>Decision support for crop problems and farming questions.</p></div>
+    <div class="card"><span class="icon">🧠</span><h3>Smart matching</h3><p>Find suitable buyers or farmers by crop, quantity and location.</p></div>
+    <div class="card"><span class="icon">🤝</span><h3>FPO network</h3><p>Connect with Farmer Producer Organizations near you.</p></div>
+    <div class="card"><span class="icon">🏛️</span><h3>Government schemes</h3><p>Discover schemes and support programs in one place.</p></div>
+    <div class="card"><span class="icon">💬</span><h3>Direct chat</h3><p>Talk to buyers and partners about price, quality and delivery.</p></div>
+    <div class="card"><span class="icon">🚚</span><h3>Logistics</h3><p>Move produce from pickup to delivery with logistics partners.</p></div>
+  </div>
+</section>
+
+<section id="faq">
+  <h2>Common questions</h2>
+  <p class="section-sub">Quick answers before you start.</p>
+  <details><summary>Who can use Shivar?</summary><p>Farmers, industries and bulk buyers, and logistics partners. You choose your role when you sign in.</p></details>
+  <details><summary>Are price forecasts guaranteed?</summary><p>No. Forecasts are estimates to support your decisions, not guaranteed prices or financial advice.</p></details>
+  <details><summary>Is the AI advisory a replacement for an expert?</summary><p>No. It is a decision-support tool. Please confirm important decisions with a qualified agricultural professional.</p></details>
+  <details><summary>Should I verify government scheme details?</summary><p>Yes. Always check scheme information against official government sources before applying.</p></details>
+</section>
+
+<div class="cta">
+  <h2>Ready to begin?</h2>
+  <p>Choose your role and start using Shivar.</p>
+  <div class="cta-actions">
+    <a class="btn btn-primary" href="home.html">Enter Shivar →</a>
+    <a class="btn btn-secondary" href="index.html?changeLang=1">Change language</a>
+  </div>
+</div>
+<script>
+  document.getElementById('logoutBtn').addEventListener('click', function () {
+    sessionStorage.clear();
+    // localStorage.removeItem('shivarUser');  // use your real key names
+    window.location.replace('index.html');
+  });
+</script>
+<p class="note">Shivar is a prototype. Weather, market, price and scheme information depends on the quality of the underlying data.</p>
+
+</body>
+</html>
