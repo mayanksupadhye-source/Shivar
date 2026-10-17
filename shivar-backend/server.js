@@ -20,6 +20,7 @@ const advisorRoutes = require('./routes/advisor');
 
 const logisticsTransactionRoutes = require('./routes/logisticsTransactions');
 const logisticsMessageRoutes = require('./routes/logisticsMessages');
+const qualityRoutes = require('./routes/quality.routes');
 
 const app = express();
 const server = http.createServer(app);
@@ -50,6 +51,9 @@ app.use('/api/advisor', advisorRoutes);
 // Logistics portal endpoints
 app.use('/api/logistics/transactions', logisticsTransactionRoutes);
 app.use('/api/logistics/messages', logisticsMessageRoutes);
+
+// AI Crop Quality API
+app.use('/api/quality', qualityRoutes);
 
 app.get('/', (req, res) => {
   res.json({ status: 'SHIVAR API is running', version: '2.0-canonical' });
